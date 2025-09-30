@@ -46,15 +46,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/sleep-app.git"
+    "url": "https://github.com/EMJ9425/Kamalani-Sound.git"
   },
   "build": {
     "appId": "com.erikstudio.sleep",
     "productName": "Sleep",
     "publish": [
       {
-        "provider": "generic",
-        "url": "https://your-update-server.com/updates"
+        "provider": "github",
+        "owner": "EMJ9425",
+        "repo": "Kamalani-Sound"
       }
     ]
   }

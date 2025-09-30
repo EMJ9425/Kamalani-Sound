@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Sound Machine</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; media-src 'self' data: blob:;">
+  </head>
+  <body>
+    <!-- Home Screen -->
+    <div class="home-screen" id="homeScreen">
+      <div class="greeting-container">
+        <h1 class="greeting-text" id="greetingText">Good Evening</h1>
+        <p class="greeting-subtitle">Tap anywhere to continue</p>
+        <div class="home-clock" id="homeClock">00:00</div>
+      </div>
+    </div>
+
+    <div class="app" id="app" style="display: none;">
+      <header class="header">
+        <nav class="menu-bar">
+          <button id="menuHome" class="menu-item active">🏠 Home</button>
+          <button id="menuTimer" class="menu-item">⏰ Timer</button>
+          <button id="menuVolume" class="menu-item">🔊 Volume</button>
+          <button id="menuEQ" class="menu-item">🎛️ Equalizer</button>
+          <button id="menuSettings" class="menu-item">⚙️ Settings</button>
+        </nav>
+        <button id="dimScreen" class="dim-btn-header">💤</button>
+      </header>
+
+      <main class="main">
+        <!-- Home Page -->
+        <div id="homePage" class="page-content">
+          <!-- Single Sound Player -->
+          <div class="sound-player">
+            <div class="sound-info">
+              <div class="sound-icon">🌧️</div>
+              <h2 class="sound-title">Kamalani's Rain Sounds</h2>
+            </div>
+
+            <div class="player-controls">
+              <button id="playBtn" class="play-button">
+                <span class="play-icon">😴</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Light switch toggle (bottom right corner) -->
+        <div class="light-switch-container" id="lightSwitchContainer" style="display: none;">
+          <label class="light-switch">
+            <input type="checkbox" id="lightSwitchToggle">
+            <span class="light-switch-slider"></span>
+          </label>
+        </div>
+
+        <!-- Timer Page -->
+        <div id="timerPage" class="page-content" style="display: none;">
+          <div class="timer-section">
+            <h3>⏰ Timer & Alarm</h3>
+
+            <div class="timer-controls">
+              <div class="timer-input">
+                <label for="timerSelect">Sleep Timer</label>
+                <select id="timerSelect" class="timer-select">
+                  <option value="0">No Timer</option>
+                  <option value="5">5 minutes</option>
+                  <option value="15">15 minutes</option>
+                  <option value="30">30 minutes</option>
+                  <option value="45">45 minutes</option>
+                  <option value="60">1 hour</option>
+                  <option value="90">1.5 hours</option>
+                  <option value="120">2 hours</option>
+                </select>
+              </div>
+
+              <div class="alarm-input">
+                <label for="alarmTime">Wake-up Alarm</label>
+                <input type="time" id="alarmTime" class="alarm-time">
+                <button id="setAlarm" class="alarm-btn">Set Alarm</button>
+              </div>
+            </div>
+
+            <div id="timerDisplay" class="timer-display" style="display: none;">
+              <div class="timer-info">
+                <span class="timer-label">Time Remaining:</span>
+                <span id="timerText" class="timer-text">00:00</span>
+              </div>
+              <button id="cancelTimer" class="cancel-btn">Cancel Timer</button>
+            </div>
+
+            <div id="alarmDisplay" class="alarm-display" style="display: none;">
+              <div class="alarm-info">
+                <span class="alarm-label">Alarm Set For:</span>
+                <span id="alarmText" class="alarm-text">--:--</span>
+              </div>
+              <button id="cancelAlarm" class="cancel-btn">Cancel Alarm</button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Full Graphic EQ Page -->
+    <div id="eqPage" class="eq-page" style="display: none;">
+      <div class="eq-header">
+        <h2>🎛️ Graphic Equalizer</h2>
+        <button id="closeEQ" class="close-eq-btn">✕</button>
+      </div>
+
+      <div class="eq-visualizer">
+        <div class="eq-bands-container">
+          <div class="eq-band-full">
+            <div class="eq-frequency-label">32Hz</div>
+            <input type="range" id="eq-32" class="eq-slider-vertical" min="-12" max="12" value="0" step="0.5" orient="vertical">
+            <div id="eq-value-32" class="eq-value">0dB</div>
+          </div>
+          <div class="eq-band-full">
+            <div class="eq-frequency-label">64Hz</div>
+            <input type="range" id="eq-64" class="eq-slider-vertical" min="-12" max="12" value="0" step="0.5" orient="vertical">
+            <div id="eq-value-64" class="eq-value">0dB</div>
+          </div>
+          <div class="eq-band-full">
+            <div class="eq-frequency-label">125Hz</div>
+            <input type="range" id="eq-125" class="eq-slider-vertical" min="-12" max="12" value="0" step="0.5" orient="vertical">
+            <div id="eq-value-125" class="eq-value">0dB</div>
+          </div>
+          <div class="eq-band-full">
+            <div class="eq-frequency-label">250Hz</div>
+            <input type="range" id="eq-250" class="eq-slider-vertical" min="-12" max="12" value="0" step="0.5" orient="vertical">
+            <div id="eq-value-250" class="eq-value">0dB</div>
+          </div>
+          <div class="eq-band-full">
+            <div class="eq-frequency-label">500Hz</div>
+            <input type="range" id="eq-500" class="eq-slider-vertical" min="-12" max="12" value="0" step="0.5" orient="vertical">
+            <div id="eq-value-500" class="eq-value">0dB</div>
+          </div>
+          <div class="eq-band-full">
+            <div class="eq-frequency-label">1kHz</div>
+            <input type="range" id="eq-1000" class="eq-slider-vertical" min="-12" max="12" value="0" step="0.5" orient="vertical">
+            <div id="eq-value-1000" class="eq-value">0dB</div>
+          </div>
+          <div class="eq-band-full">
+            <div class="eq-frequency-label">2kHz</div>
+            <input type="range" id="eq-2000" class="eq-slider-vertical" min="-12" max="12" value="0" step="0.5" orient="vertical">
+            <div id="eq-value-2000" class="eq-value">0dB</div>
+          </div>
+          <div class="eq-band-full">
+            <div class="eq-frequency-label">4kHz</div>
+            <input type="range" id="eq-4000" class="eq-slider-vertical" min="-12" max="12" value="0" step="0.5" orient="vertical">
+            <div id="eq-value-4000" class="eq-value">0dB</div>
+          </div>
+          <div class="eq-band-full">
+            <div class="eq-frequency-label">8kHz</div>
+            <input type="range" id="eq-8000" class="eq-slider-vertical" min="-12" max="12" value="0" step="0.5" orient="vertical">
+            <div id="eq-value-8000" class="eq-value">0dB</div>
+          </div>
+          <div class="eq-band-full">
+            <div class="eq-frequency-label">16kHz</div>
+            <input type="range" id="eq-16000" class="eq-slider-vertical" min="-12" max="12" value="0" step="0.5" orient="vertical">
+            <div id="eq-value-16000" class="eq-value">0dB</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="eq-controls-bottom">
+        <button id="resetEQFull" class="reset-eq-btn">Reset All</button>
+        <div class="eq-presets">
+          <button class="preset-btn" data-preset="flat">Flat</button>
+          <button class="preset-btn" data-preset="bass">Bass Boost</button>
+          <button class="preset-btn" data-preset="treble">Treble Boost</button>
+          <button class="preset-btn" data-preset="vocal">Vocal</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sleep Mode - Black Clock -->
+    <div id="sleepMode" class="sleep-mode" style="display: none;">
+      <div id="sleepClock" class="sleep-clock">00:00</div>
+      <div id="sleepDate" class="sleep-date">Monday, January 1</div>
+      <div class="sleep-status">🌧️ Rain sounds playing • Touch to wake</div>
+    </div>
+
+    <!-- Screen Dimmer -->
+    <div id="screenDimmer" class="screen-dimmer" style="display: none;">
+      <div class="wake-message">Touch to wake</div>
+    </div>
+
+    <!-- Settings Page -->
+    <div id="settingsPage" class="settings-page" style="display: none;">
+      <div class="settings-container">
+        <div class="settings-header">
+          <h2>⚙️ Settings</h2>
+          <button id="closeSettings" class="close-settings-btn">✕</button>
+        </div>
+
+        <div class="settings-content">
+          <div class="setting-item">
+            <label for="userName">Your Name</label>
+            <input type="text" id="userName" class="name-input" placeholder="Enter your name" maxlength="30">
+            <p class="setting-description">This name will appear in the greeting when you open the app</p>
+          </div>
+
+          <div class="setting-item">
+            <label>💡 Philips Hue Integration</label>
+            <p class="setting-description">Connect your Philips Hue lights to automatically dim when you sleep</p>
+
+            <div class="hue-input-group">
+              <input type="text" id="hueBridgeIP" class="hue-ip-input" placeholder="Bridge IP (e.g., 192.168.1.100)">
+              <button id="connectHue" class="hue-btn">Connect</button>
+            </div>
+            <p class="setting-description" style="font-size: 0.85rem; margin-top: 0.5rem;">
+              Find your bridge IP in the Philips Hue app: Settings → My Hue System → [Your Bridge] → IP Address
+            </p>
+
+            <div id="hueStatus" class="hue-status" style="display: none;">
+              <span id="hueStatusText">Not connected</span>
+            </div>
+
+            <div id="hueOptions" class="hue-options" style="display: none;">
+              <div class="hue-lights-section">
+                <label class="section-label">Select Rooms to Control</label>
+                <button id="refreshLights" class="refresh-lights-btn">🔄 Refresh Rooms</button>
+                <div id="hueLightsList" class="hue-lights-list">
+                  <p class="loading-text">Loading rooms...</p>
+                </div>
+              </div>
+
+              <div class="hue-automation-section">
+                <label class="section-label">Automation</label>
+                <label>
+                  <input type="checkbox" id="hueDimOnSleep" checked>
+                  Turn off selected rooms when sleep button is pressed
+                </label>
+                <label>
+                  <input type="checkbox" id="hueWakeOnAlarm" checked>
+                  Gradually brighten selected rooms when alarm goes off
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="setting-item">
+            <label>🔄 App Updates</label>
+            <p class="setting-description">Check for the latest version of the app</p>
+            <button id="checkUpdates" class="update-btn">Check for Updates</button>
+            <p id="updateStatus" class="setting-description" style="margin-top: 0.5rem; display: none;"></p>
+          </div>
+
+          <button id="saveName" class="save-btn">Save Changes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Volume Popup -->
+    <div id="volumePage" class="volume-page" style="display: none;">
+      <div class="volume-popup">
+        <div class="volume-header">
+          <h2>🔊 Volume</h2>
+          <button id="closeVolume" class="close-volume-btn">✕</button>
+        </div>
+
+        <div class="volume-content">
+          <div class="volume-control">
+            <input type="range" id="volumeSlider" min="0" max="100" value="50" class="volume-slider">
+            <span id="volumeValue">50%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </body>
+</html>

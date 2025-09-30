@@ -1,6 +1,7 @@
 // Import CSS
 import './index.css';
 import { HueIntegration } from './hue-integration';
+import { BlinkIntegration } from './blink-integration';
 
 class SoundMachine {
   private audio: HTMLAudioElement | null = null;
@@ -10,10 +11,12 @@ class SoundMachine {
   private sourceNode: MediaElementAudioSourceNode | null = null;
   private gainNode: GainNode | null = null;
   private hue: HueIntegration;
+  private blink: BlinkIntegration;
   private eqFilters: BiquadFilterNode[] = [];
 
   constructor() {
     this.hue = new HueIntegration();
+    this.blink = new BlinkIntegration();
     this.init();
   }
 
@@ -27,6 +30,8 @@ class SoundMachine {
       this.setupControls();
       this.setupHueControls();
       this.setupHomeLightControls();
+      this.setupCameraControls();
+      this.checkBetaFeatures(); // Check beta features on startup
       console.log('✅ Sound Machine initialized successfully');
     } catch (error) {
       console.error('❌ Failed to initialize Sound Machine:', error);
@@ -37,13 +42,115 @@ class SoundMachine {
     const soundTitle = document.querySelector('.sound-title');
     if (soundTitle) {
       const name = this.getUserName();
-      soundTitle.textContent = `${name}'s Rain Sounds`;
+      soundTitle.textContent = `Sleep by ${name}`;
     }
   }
 
   private getUserName(): string {
     // Get name from localStorage, default to 'Kamalani'
     return localStorage.getItem('userName') || 'Kamalani';
+  }
+
+  private showSettingsSavedNotification(): void {
+    console.log('💾 Showing settings saved notification');
+    const notification = document.getElementById('settingsSavedNotification');
+    console.log('💾 Notification element:', notification);
+    if (notification) {
+      notification.style.display = 'block';
+      console.log('💾 Notification displayed');
+      // Scroll to top to make sure notification is visible
+      const settingsContainer = document.querySelector('.settings-container');
+      if (settingsContainer) {
+        settingsContainer.scrollTop = 0;
+        console.log('💾 Scrolled to top');
+      }
+      // Hide after 3 seconds
+      setTimeout(() => {
+        notification.style.display = 'none';
+        console.log('💾 Notification hidden');
+      }, 3000);
+    } else {
+      console.error('💾 Notification element not found!');
+    }
+  }
+
+  private updateGreeting(): void {
+    const greetingText = document.getElementById('greetingText');
+    if (!greetingText) return;
+
+    // Determine greeting based on time of day
+    const hour = new Date().getHours();
+    let greeting = 'Good Evening';
+    const name = this.getUserName();
+    const pronoun = localStorage.getItem('userPronoun') || 'nonbinary';
+
+    // Time-based greetings
+    if (hour >= 5 && hour < 12) {
+      greeting = 'Good Morning';
+    } else if (hour >= 12 && hour < 17) {
+      greeting = 'Good Afternoon';
+    } else if (hour >= 17 && hour < 21) {
+      greeting = 'Good Evening';
+    } else {
+      greeting = 'Goodnight';
+    }
+
+    // Randomly use Hawaiian greetings (20% chance)
+    if (Math.random() < 0.2) {
+      greeting = Math.random() < 0.5 ? 'Aloha' : 'Mahalo';
+    }
+
+    // Get personalized term of endearment based on pronoun
+    let addressName = name;
+
+    if (pronoun === 'woman') {
+      const womanTerms = ['Beautiful', 'Gorgeous', 'Love', 'Darling', 'Dear', 'Mamacita'];
+      if (Math.random() < 0.5) {
+        addressName = womanTerms[Math.floor(Math.random() * womanTerms.length)];
+      }
+    } else if (pronoun === 'man') {
+      const manTerms = ['Handsome', 'Feller', 'Partner', 'Papi', 'Papi Chulo', 'Guy'];
+      if (Math.random() < 0.5) {
+        addressName = manTerms[Math.floor(Math.random() * manTerms.length)];
+      }
+    } else if (pronoun === 'they') {
+      const allTerms = [
+        'Beautiful', 'Gorgeous', 'Love', 'Darling', 'Dear', 'Mamacita',
+        'Handsome', 'Feller', 'Partner', 'Papi', 'Papi Chulo', 'Guy'
+      ];
+      if (Math.random() < 0.5) {
+        addressName = allTerms[Math.floor(Math.random() * allTerms.length)];
+      }
+    }
+    // Non-binary: always use their name (no change needed)
+
+    greetingText.textContent = `${greeting} ${addressName}`;
+  }
+
+  private updateClock(): void {
+    const homeClock = document.getElementById('homeClock');
+    if (!homeClock) return;
+
+    const now = new Date();
+    let hours = now.getHours();
+    const minutes = now.getMinutes();
+
+    // Check time format preference (default to 12-hour)
+    const use24Hour = localStorage.getItem('timeFormat') === '24';
+
+    let formattedTime: string;
+    if (use24Hour) {
+      // 24-hour format
+      formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    } else {
+      // 12-hour format with AM/PM
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12; // Convert 0 to 12
+      formattedTime = `${hours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+    }
+
+    homeClock.textContent = formattedTime;
   }
 
   private setupHomeScreen(): void {
@@ -55,9 +162,24 @@ class SoundMachine {
     // Update clock
     const updateClock = () => {
       const now = new Date();
-      const hours = now.getHours();
+      let hours = now.getHours();
       const minutes = now.getMinutes();
-      const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+
+      // Check time format preference (default to 12-hour)
+      const use24Hour = localStorage.getItem('timeFormat') === '24';
+
+      let formattedTime: string;
+      if (use24Hour) {
+        // 24-hour format
+        formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      } else {
+        // 12-hour format with AM/PM
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12; // Convert 0 to 12
+        formattedTime = `${hours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+      }
+
       if (homeClock) {
         homeClock.textContent = formattedTime;
       }
@@ -67,24 +189,8 @@ class SoundMachine {
     updateClock();
     const clockInterval = setInterval(updateClock, 1000);
 
-    if (greetingText) {
-      // Determine greeting based on time of day
-      const hour = new Date().getHours();
-      let greeting = 'Good Evening';
-      const name = this.getUserName();
-
-      if (hour >= 5 && hour < 12) {
-        greeting = 'Good Morning';
-      } else if (hour >= 12 && hour < 17) {
-        greeting = 'Good Afternoon';
-      } else if (hour >= 17 && hour < 21) {
-        greeting = 'Good Evening';
-      } else {
-        greeting = 'Goodnight';
-      }
-
-      greetingText.textContent = `${greeting} ${name}`;
-    }
+    // Initialize greeting
+    this.updateGreeting();
 
     // Handle click to dismiss home screen
     if (homeScreen && app) {
@@ -264,13 +370,13 @@ class SoundMachine {
 
     if (saveNameBtn && userNameInput && settingsPage) {
       saveNameBtn.addEventListener('click', () => {
+        console.log('💾 Save button clicked');
         const newName = userNameInput.value.trim();
+        console.log('💾 New name:', newName);
         if (newName) {
           localStorage.setItem('userName', newName);
           this.updateSoundTitle(); // Update the sound title immediately
-          settingsPage.style.display = 'none';
-          // Show confirmation
-          alert(`Name saved! Your greeting will now say "${newName}"`);
+          this.showSettingsSavedNotification();
         } else {
           alert('Please enter a name');
         }
@@ -299,6 +405,112 @@ class SoundMachine {
             updateStatus.textContent = 'Error checking for updates. Please try again later.';
           }
         }
+      });
+    }
+
+    // Time format toggle buttons
+    const time12hrBtn = document.getElementById('time12hr');
+    const time24hrBtn = document.getElementById('time24hr');
+
+    // Load saved time format preference
+    const savedTimeFormat = localStorage.getItem('timeFormat') || '12';
+    if (savedTimeFormat === '24') {
+      time12hrBtn?.classList.remove('active');
+      time24hrBtn?.classList.add('active');
+    }
+
+    if (time12hrBtn) {
+      time12hrBtn.addEventListener('click', () => {
+        localStorage.setItem('timeFormat', '12');
+        time12hrBtn.classList.add('active');
+        time24hrBtn?.classList.remove('active');
+        this.showSettingsSavedNotification();
+      });
+    }
+
+    if (time24hrBtn) {
+      time24hrBtn.addEventListener('click', () => {
+        localStorage.setItem('timeFormat', '24');
+        time24hrBtn.classList.add('active');
+        time12hrBtn?.classList.remove('active');
+        this.showSettingsSavedNotification();
+      });
+    }
+
+    // Pronoun selection buttons
+    const pronounWomanBtn = document.getElementById('pronounWoman');
+    const pronounManBtn = document.getElementById('pronounMan');
+    const pronounTheyBtn = document.getElementById('pronounThey');
+    const pronounNonBinaryBtn = document.getElementById('pronounNonBinary');
+    const pronounBtns = [pronounWomanBtn, pronounManBtn, pronounTheyBtn, pronounNonBinaryBtn];
+
+    // Load saved pronoun preference (default to nonbinary)
+    const savedPronoun = localStorage.getItem('userPronoun') || 'nonbinary';
+
+    // Set active button based on saved preference
+    if (savedPronoun === 'woman') {
+      pronounWomanBtn?.classList.add('active');
+    } else if (savedPronoun === 'man') {
+      pronounManBtn?.classList.add('active');
+    } else if (savedPronoun === 'they') {
+      pronounTheyBtn?.classList.add('active');
+    } else {
+      pronounNonBinaryBtn?.classList.add('active');
+    }
+
+    // Helper function to set active pronoun button
+    const setActivePronoun = (activeBtn: HTMLElement | null, pronoun: string) => {
+      pronounBtns.forEach(btn => btn?.classList.remove('active'));
+      activeBtn?.classList.add('active');
+      localStorage.setItem('userPronoun', pronoun);
+      this.showSettingsSavedNotification();
+    };
+
+    if (pronounWomanBtn) {
+      pronounWomanBtn.addEventListener('click', () => {
+        setActivePronoun(pronounWomanBtn, 'woman');
+      });
+    }
+
+    if (pronounManBtn) {
+      pronounManBtn.addEventListener('click', () => {
+        setActivePronoun(pronounManBtn, 'man');
+      });
+    }
+
+    if (pronounTheyBtn) {
+      pronounTheyBtn.addEventListener('click', () => {
+        setActivePronoun(pronounTheyBtn, 'they');
+      });
+    }
+
+    if (pronounNonBinaryBtn) {
+      pronounNonBinaryBtn.addEventListener('click', () => {
+        setActivePronoun(pronounNonBinaryBtn, 'nonbinary');
+      });
+    }
+
+    // Beta features toggle
+    const betaToggle = document.getElementById('betaToggle') as HTMLInputElement;
+    const betaStatus = document.getElementById('betaStatus');
+
+    if (betaToggle) {
+      // Set initial state
+      const betaEnabled = localStorage.getItem('betaEnabled') === 'true';
+      betaToggle.checked = betaEnabled;
+      if (betaStatus) {
+        betaStatus.textContent = betaEnabled ? 'Enabled' : 'Disabled';
+      }
+
+      betaToggle.addEventListener('change', () => {
+        const isEnabled = betaToggle.checked;
+        localStorage.setItem('betaEnabled', isEnabled.toString());
+        if (betaStatus) {
+          betaStatus.textContent = isEnabled ? 'Enabled' : 'Disabled';
+        }
+        this.showSettingsSavedNotification();
+        // Update camera button visibility
+        this.checkBetaFeatures();
       });
     }
   }
@@ -446,24 +658,55 @@ class SoundMachine {
     });
   }
 
+  private checkBetaFeatures(): void {
+    const betaEnabled = localStorage.getItem('betaEnabled') === 'true';
+    const cameraBtn = document.getElementById('menuCamera');
+
+    if (cameraBtn) {
+      cameraBtn.style.display = betaEnabled ? 'block' : 'none';
+    }
+  }
+
   private setupMenuNavigation(): void {
     const menuHome = document.getElementById('menuHome');
     const menuTimer = document.getElementById('menuTimer');
     const menuVolume = document.getElementById('menuVolume');
     const menuEQ = document.getElementById('menuEQ');
+    const menuCamera = document.getElementById('menuCamera');
     const menuSettings = document.getElementById('menuSettings');
 
     const homePage = document.getElementById('homePage');
     const timerPage = document.getElementById('timerPage');
     const volumePage = document.getElementById('volumePage');
     const eqPage = document.getElementById('eqPage');
+    const cameraPage = document.getElementById('cameraPage');
     const settingsPage = document.getElementById('settingsPage');
     const userNameInput = document.getElementById('userName') as HTMLInputElement;
 
     const menuItems = [menuHome, menuTimer, menuVolume, menuEQ, menuSettings];
 
+    // Store reference to this for use in nested functions
+    const self = this;
+
     const switchPage = (activeIndex: number) => {
-      // For volume, EQ, and settings - show as modal overlays
+      // Home button - show greeting screen
+      if (activeIndex === 0) {
+        const homeScreen = document.getElementById('homeScreen');
+        const app = document.getElementById('app');
+        if (homeScreen && app) {
+          // Update greeting before showing
+          self.updateGreeting();
+          // Hide main app, show greeting screen
+          app.style.display = 'none';
+          homeScreen.style.display = 'flex';
+          homeScreen.classList.remove('fade-out');
+          // Start clock update
+          self.updateClock();
+        }
+        return;
+      }
+
+      // For volume, EQ, camera, and settings - show as modal overlays
       if (activeIndex === 2) {
         // Volume popup
         if (volumePage) volumePage.style.display = 'flex';
@@ -476,6 +719,10 @@ class SoundMachine {
         }
         return;
       } else if (activeIndex === 4) {
+        // Camera page
+        if (cameraPage) cameraPage.style.display = 'flex';
+        return;
+      } else if (activeIndex === 5) {
         // Settings page
         if (settingsPage) {
           settingsPage.style.display = 'flex';
@@ -486,7 +733,7 @@ class SoundMachine {
         return;
       }
 
-      // For home and timer - switch pages normally
+      // For timer - switch pages normally
       // Hide home and timer pages
       if (homePage) homePage.style.display = 'none';
       if (timerPage) timerPage.style.display = 'none';
@@ -496,10 +743,7 @@ class SoundMachine {
       if (menuTimer) menuTimer.classList.remove('active');
 
       // Show selected page and activate menu item
-      if (activeIndex === 0 && homePage) {
-        homePage.style.display = 'flex';
-        if (menuHome) menuHome.classList.add('active');
-      } else if (activeIndex === 1 && timerPage) {
+      if (activeIndex === 1 && timerPage) {
         timerPage.style.display = 'flex';
         if (menuTimer) menuTimer.classList.add('active');
       }
@@ -521,8 +765,27 @@ class SoundMachine {
       menuEQ.addEventListener('click', () => switchPage(3));
     }
 
+    if (menuCamera) {
+      menuCamera.addEventListener('click', () => switchPage(4));
+    }
+
     if (menuSettings) {
-      menuSettings.addEventListener('click', () => switchPage(4));
+      menuSettings.addEventListener('click', () => switchPage(5));
+    }
+
+    // Camera page close button
+    const closeCamera = document.getElementById('closeCamera');
+    if (closeCamera && cameraPage) {
+      closeCamera.addEventListener('click', () => {
+        cameraPage.style.display = 'none';
+      });
+
+      // Also close when clicking outside the modal
+      cameraPage.addEventListener('click', (e) => {
+        if (e.target === cameraPage) {
+          cameraPage.style.display = 'none';
+        }
+      });
     }
   }
 
@@ -813,6 +1076,300 @@ class SoundMachine {
       lightSwitchToggle.checked = anyLightsOn;
     } catch (error) {
       console.error('Error checking light state:', error);
+    }
+  }
+
+  private setupCameraControls(): void {
+    console.log('📹 Setting up camera controls...');
+
+    const blinkLoginForm = document.getElementById('blinkLoginForm');
+    const blink2FAForm = document.getElementById('blink2FAForm');
+    const cameraView = document.getElementById('cameraView');
+    const blinkLoginBtn = document.getElementById('blinkLoginBtn') as HTMLButtonElement;
+    const blinkEmail = document.getElementById('blinkEmail') as HTMLInputElement;
+    const blinkPassword = document.getElementById('blinkPassword') as HTMLInputElement;
+    const blinkLoginStatus = document.getElementById('blinkLoginStatus');
+    const blink2FACode = document.getElementById('blink2FACode') as HTMLInputElement;
+    const blink2FABtn = document.getElementById('blink2FABtn') as HTMLButtonElement;
+    const blink2FACancel = document.getElementById('blink2FACancel') as HTMLButtonElement;
+    const blink2FAStatus = document.getElementById('blink2FAStatus');
+    const phoneLastDigits = document.getElementById('phoneLastDigits');
+    const cameraSelect = document.getElementById('cameraSelect') as HTMLSelectElement;
+    const cameraSnapshot = document.getElementById('cameraSnapshot') as HTMLImageElement;
+    const cameraPlaceholder = document.getElementById('cameraPlaceholder');
+    const refreshCamera = document.getElementById('refreshCamera') as HTMLButtonElement;
+    const blinkLogout = document.getElementById('blinkLogout');
+
+    // Check if already logged in
+    if (this.blink.isLoggedIn()) {
+      console.log('📹 User already logged in to Blink');
+      if (blinkLoginForm) blinkLoginForm.style.display = 'none';
+      if (blink2FAForm) blink2FAForm.style.display = 'none';
+      if (cameraView) cameraView.style.display = 'block';
+      this.loadCameras();
+    } else {
+      console.log('📹 User not logged in to Blink');
+    }
+
+    // Login button
+    if (blinkLoginBtn) {
+      blinkLoginBtn.addEventListener('click', async () => {
+        const email = blinkEmail?.value.trim();
+        const password = blinkPassword?.value;
+
+        if (!email || !password) {
+          if (blinkLoginStatus) {
+            blinkLoginStatus.textContent = '❌ Please enter email and password';
+            blinkLoginStatus.style.display = 'block';
+            blinkLoginStatus.style.color = '#ff6b6b';
+          }
+          return;
+        }
+
+        // Show loading
+        blinkLoginBtn.textContent = '⏳ Logging in...';
+        blinkLoginBtn.disabled = true;
+
+        const result = await this.blink.login(email, password);
+
+        if (result.success) {
+          if (blinkLoginStatus) {
+            blinkLoginStatus.textContent = '✅ ' + result.message;
+            blinkLoginStatus.style.display = 'block';
+            blinkLoginStatus.style.color = '#4ade80';
+          }
+
+          // Hide login form, show camera view
+          setTimeout(() => {
+            if (blinkLoginForm) blinkLoginForm.style.display = 'none';
+            if (cameraView) cameraView.style.display = 'block';
+            this.loadCameras();
+          }, 1000);
+        } else if (result.requires2FA) {
+          // Show 2FA form
+          if (blinkLoginStatus) {
+            blinkLoginStatus.textContent = '📱 ' + result.message;
+            blinkLoginStatus.style.display = 'block';
+            blinkLoginStatus.style.color = '#4ade80';
+          }
+
+          setTimeout(() => {
+            if (blinkLoginForm) blinkLoginForm.style.display = 'none';
+            if (blink2FAForm) blink2FAForm.style.display = 'block';
+            if (result.accountId) {
+              localStorage.setItem('blinkPendingAccountId', result.accountId);
+            }
+            // Show last 4 digits of phone if available
+            if (phoneLastDigits) {
+              phoneLastDigits.textContent = '****';
+            }
+            if (blink2FACode) blink2FACode.focus();
+          }, 1000);
+        } else {
+          if (blinkLoginStatus) {
+            blinkLoginStatus.textContent = '❌ ' + result.message;
+            blinkLoginStatus.style.display = 'block';
+            blinkLoginStatus.style.color = '#ff6b6b';
+          }
+          blinkLoginBtn.textContent = '🔐 Login to Blink';
+          blinkLoginBtn.disabled = false;
+        }
+      });
+    }
+
+    // 2FA Verify button
+    if (blink2FABtn) {
+      blink2FABtn.addEventListener('click', async () => {
+        const code = blink2FACode?.value.trim();
+        const accountId = localStorage.getItem('blinkPendingAccountId');
+
+        if (!code || code.length !== 6) {
+          if (blink2FAStatus) {
+            blink2FAStatus.textContent = '❌ Please enter a 6-digit code';
+            blink2FAStatus.style.display = 'block';
+            blink2FAStatus.style.color = '#ff6b6b';
+          }
+          return;
+        }
+
+        if (!accountId) {
+          if (blink2FAStatus) {
+            blink2FAStatus.textContent = '❌ Session expired. Please login again.';
+            blink2FAStatus.style.display = 'block';
+            blink2FAStatus.style.color = '#ff6b6b';
+          }
+          return;
+        }
+
+        // Show loading
+        blink2FABtn.textContent = '⏳ Verifying...';
+        blink2FABtn.disabled = true;
+
+        const result = await this.blink.verify2FA(accountId, code);
+
+        if (result.success) {
+          if (blink2FAStatus) {
+            blink2FAStatus.textContent = '✅ ' + result.message;
+            blink2FAStatus.style.display = 'block';
+            blink2FAStatus.style.color = '#4ade80';
+          }
+
+          // Hide 2FA form, show camera view
+          setTimeout(() => {
+            if (blink2FAForm) blink2FAForm.style.display = 'none';
+            if (cameraView) cameraView.style.display = 'block';
+            this.loadCameras();
+          }, 1000);
+        } else {
+          if (blink2FAStatus) {
+            blink2FAStatus.textContent = '❌ ' + result.message;
+            blink2FAStatus.style.display = 'block';
+            blink2FAStatus.style.color = '#ff6b6b';
+          }
+          blink2FABtn.textContent = '✅ Verify Code';
+          blink2FABtn.disabled = false;
+        }
+      });
+    }
+
+    // 2FA Cancel button
+    if (blink2FACancel) {
+      blink2FACancel.addEventListener('click', () => {
+        if (blink2FAForm) blink2FAForm.style.display = 'none';
+        if (blinkLoginForm) blinkLoginForm.style.display = 'block';
+        if (blink2FACode) blink2FACode.value = '';
+        if (blink2FAStatus) blink2FAStatus.style.display = 'none';
+        if (blinkLoginBtn) {
+          blinkLoginBtn.textContent = '🔐 Login to Blink';
+          blinkLoginBtn.disabled = false;
+        }
+        localStorage.removeItem('blinkPendingAccountId');
+      });
+    }
+
+    // Camera selection
+    if (cameraSelect) {
+      cameraSelect.addEventListener('change', async () => {
+        const selectedValue = cameraSelect.value;
+        if (!selectedValue) return;
+
+        const [networkId, cameraId] = selectedValue.split('-').map(Number);
+        await this.showCameraSnapshot(networkId, cameraId);
+      });
+    }
+
+    // Refresh button
+    if (refreshCamera) {
+      refreshCamera.addEventListener('click', async () => {
+        const selectedValue = cameraSelect?.value;
+        if (!selectedValue) return;
+
+        const [networkId, cameraId] = selectedValue.split('-').map(Number);
+        refreshCamera.textContent = '⏳ Refreshing...';
+        refreshCamera.disabled = true;
+
+        await this.showCameraSnapshot(networkId, cameraId, true);
+
+        refreshCamera.textContent = '🔄 Refresh Snapshot';
+        refreshCamera.disabled = false;
+      });
+    }
+
+    // Logout button
+    if (blinkLogout) {
+      blinkLogout.addEventListener('click', () => {
+        this.blink.logout();
+        if (cameraView) cameraView.style.display = 'none';
+        if (blink2FAForm) blink2FAForm.style.display = 'none';
+        if (blinkLoginForm) blinkLoginForm.style.display = 'block';
+        if (blinkPassword) blinkPassword.value = '';
+        if (blink2FACode) blink2FACode.value = '';
+        if (blinkLoginStatus) blinkLoginStatus.style.display = 'none';
+        if (blink2FAStatus) blink2FAStatus.style.display = 'none';
+        if (cameraSnapshot) cameraSnapshot.style.display = 'none';
+        if (cameraPlaceholder) cameraPlaceholder.style.display = 'block';
+        localStorage.removeItem('blinkPendingAccountId');
+      });
+    }
+  }
+
+  private async loadCameras(): Promise<void> {
+    const cameraSelect = document.getElementById('cameraSelect') as HTMLSelectElement;
+    if (!cameraSelect) return;
+
+    try {
+      cameraSelect.innerHTML = '<option value="">Loading cameras...</option>';
+      const cameras = await this.blink.getCameras();
+
+      if (cameras.length === 0) {
+        cameraSelect.innerHTML = '<option value="">No cameras found</option>';
+        return;
+      }
+
+      cameraSelect.innerHTML = '<option value="">Select a camera</option>';
+      cameras.forEach((camera: any) => {
+        const option = document.createElement('option');
+        option.value = `${camera.network_id}-${camera.id}`;
+        option.textContent = camera.name || `Camera ${camera.id}`;
+        cameraSelect.appendChild(option);
+      });
+    } catch (error) {
+      console.error('Error loading cameras:', error);
+      cameraSelect.innerHTML = '<option value="">Error loading cameras</option>';
+    }
+  }
+
+  private async showCameraSnapshot(networkId: number, cameraId: number, forceRefresh: boolean = false): Promise<void> {
+    const cameraSnapshot = document.getElementById('cameraSnapshot') as HTMLImageElement;
+    const cameraPlaceholder = document.getElementById('cameraPlaceholder');
+
+    if (!cameraSnapshot) return;
+
+    try {
+      let thumbnailUrl: string | null;
+
+      if (forceRefresh) {
+        // Request a new thumbnail
+        thumbnailUrl = await this.blink.getThumbnail(networkId, cameraId);
+      } else {
+        // Get the latest thumbnail
+        thumbnailUrl = this.blink.getLatestThumbnailUrl(networkId, cameraId);
+      }
+
+      if (thumbnailUrl) {
+        console.log(`📹 Thumbnail URL: ${thumbnailUrl}`);
+        // Fetch the image through the main process and convert to data URL
+        if (window.electronAPI && window.electronAPI.fetchImage) {
+          console.log('📹 Fetching image through main process...');
+          const dataUrl = await window.electronAPI.fetchImage(thumbnailUrl);
+          console.log(`📹 Received data URL, length: ${dataUrl.length}`);
+          console.log(`📹 Data URL preview: ${dataUrl.substring(0, 100)}...`);
+          cameraSnapshot.src = dataUrl;
+          cameraSnapshot.style.display = 'block';
+          if (cameraPlaceholder) cameraPlaceholder.style.display = 'none';
+          console.log('📹 Image should now be visible');
+        } else {
+          console.error('❌ fetchImage API not available');
+          if (cameraPlaceholder) {
+            cameraPlaceholder.textContent = 'Failed to load camera snapshot';
+            cameraPlaceholder.style.display = 'block';
+          }
+          cameraSnapshot.style.display = 'none';
+        }
+      } else {
+        if (cameraPlaceholder) {
+          cameraPlaceholder.textContent = 'Failed to load camera snapshot';
+          cameraPlaceholder.style.display = 'block';
+        }
+        cameraSnapshot.style.display = 'none';
+      }
+    } catch (error) {
+      console.error('Error showing camera snapshot:', error);
+      if (cameraPlaceholder) {
+        cameraPlaceholder.textContent = 'Error loading camera snapshot';
+        cameraPlaceholder.style.display = 'block';
+      }
+      cameraSnapshot.style.display = 'none';
     }
   }
 }

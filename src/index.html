@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <title>Sound Machine</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; media-src 'self' data: blob:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; media-src 'self' data: blob:; img-src 'self' data: https://*.immedia-semi.com;">
   </head>
   <body>
     <!-- Home Screen -->
@@ -23,6 +23,7 @@
           <button id="menuTimer" class="menu-item">⏰ Timer</button>
           <button id="menuVolume" class="menu-item">🔊 Volume</button>
           <button id="menuEQ" class="menu-item">🎛️ Equalizer</button>
+          <button id="menuCamera" class="menu-item" style="display: none;">📹 Camera</button>
           <button id="menuSettings" class="menu-item">⚙️ Settings</button>
         </nav>
         <button id="dimScreen" class="dim-btn-header">💤</button>
@@ -52,6 +53,71 @@
             <input type="checkbox" id="lightSwitchToggle">
             <span class="light-switch-slider"></span>
           </label>
+        </div>
+
+        <!-- Camera Page (Beta) -->
+        <div id="cameraPage" class="camera-page" style="display: none;">
+          <div class="camera-modal">
+            <div class="camera-header">
+              <h2>📹 Camera Monitor</h2>
+              <button id="closeCamera" class="close-camera-btn">✕</button>
+            </div>
+
+            <div class="camera-content">
+              <!-- Blink Login Form -->
+              <div id="blinkLoginForm">
+                <div class="setting-item">
+                  <label>📧 Blink Email</label>
+                  <input type="email" id="blinkEmail" class="hue-ip-input" placeholder="your@email.com" style="width: 100%;">
+                </div>
+
+                <div class="setting-item">
+                  <label>🔒 Blink Password</label>
+                  <input type="password" id="blinkPassword" class="hue-ip-input" placeholder="Your password" style="width: 100%;">
+                </div>
+
+                <button id="blinkLoginBtn" class="save-btn">🔐 Login to Blink</button>
+                <p id="blinkLoginStatus" class="setting-description" style="margin-top: 1rem; display: none;"></p>
+              </div>
+
+              <!-- 2FA Verification Form -->
+              <div id="blink2FAForm" style="display: none;">
+                <div class="setting-item">
+                  <label>📱 Verification Code</label>
+                  <p class="setting-description" style="margin-bottom: 1rem;">
+                    Enter the 6-digit code sent to your phone ending in <span id="phoneLastDigits"></span>
+                  </p>
+                  <input type="text" id="blink2FACode" class="hue-ip-input" placeholder="000000" maxlength="6" style="width: 100%; text-align: center; font-size: 1.5rem; letter-spacing: 0.5rem;">
+                </div>
+
+                <button id="blink2FABtn" class="save-btn">✅ Verify Code</button>
+                <button id="blink2FACancel" class="save-btn" style="margin-top: 0.5rem; background: rgba(255, 69, 69, 0.2);">← Back to Login</button>
+                <p id="blink2FAStatus" class="setting-description" style="margin-top: 1rem; display: none;"></p>
+              </div>
+
+              <!-- Camera View (shown after login) -->
+              <div id="cameraView" style="display: none;">
+                <div class="setting-item">
+                  <label>📹 Select Camera</label>
+                  <select id="cameraSelect" class="timer-select" style="width: 100%;">
+                    <option value="">Loading cameras...</option>
+                  </select>
+                </div>
+
+                <div class="camera-container" id="cameraContainer" style="margin-top: 1.5rem;">
+                  <img id="cameraSnapshot" src="" alt="Camera Feed" style="width: 100%; border-radius: 12px; display: none;">
+                  <p id="cameraPlaceholder" style="text-align: center; padding: 3rem; opacity: 0.7;">
+                    Select a camera to view
+                  </p>
+                </div>
+
+                <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                  <button id="refreshCamera" class="save-btn" style="flex: 1;">🔄 Refresh Snapshot</button>
+                  <button id="blinkLogout" class="save-btn" style="flex: 1; background: rgba(255, 69, 69, 0.2);">🚪 Logout</button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Timer Page -->
@@ -194,11 +260,54 @@
           <button id="closeSettings" class="close-settings-btn">✕</button>
         </div>
 
+        <!-- Settings Saved Notification -->
+        <div id="settingsSavedNotification" class="settings-saved-notification" style="display: none;">
+          ✓ Settings saved
+        </div>
+
         <div class="settings-content">
           <div class="setting-item">
             <label for="userName">Your Name</label>
             <input type="text" id="userName" class="name-input" placeholder="Enter your name" maxlength="30">
             <p class="setting-description">This name will appear in the greeting when you open the app</p>
+          </div>
+
+          <div class="setting-item">
+            <label>🕐 Time Format</label>
+            <p class="setting-description">Choose how the clock is displayed</p>
+            <div class="time-format-toggle">
+              <button id="time12hr" class="time-format-btn active">12-Hour (AM/PM)</button>
+              <button id="time24hr" class="time-format-btn">24-Hour (Military)</button>
+            </div>
+          </div>
+
+          <div class="setting-item">
+            <label>👤 Pronouns & Greetings</label>
+            <p class="setting-description">Personalize how the app greets you</p>
+            <div class="pronoun-toggle">
+              <button id="pronounWoman" class="pronoun-btn">Woman</button>
+              <button id="pronounMan" class="pronoun-btn">Man</button>
+              <button id="pronounThey" class="pronoun-btn">They/Them</button>
+              <button id="pronounNonBinary" class="pronoun-btn">Non-Binary</button>
+            </div>
+            <p class="setting-description" style="margin-top: 0.75rem; font-size: 0.9rem; opacity: 0.7;">
+              The app will use personalized terms of endearment in greetings based on your selection
+            </p>
+          </div>
+
+          <div class="setting-item">
+            <label>🧪 Beta Features</label>
+            <p class="setting-description">Enable experimental features</p>
+            <div class="beta-toggle">
+              <label class="switch">
+                <input type="checkbox" id="betaToggle">
+                <span class="slider"></span>
+              </label>
+              <span id="betaStatus" style="margin-left: 1rem; opacity: 0.7;">Disabled</span>
+            </div>
+            <p class="setting-description" style="margin-top: 0.75rem; font-size: 0.9rem; opacity: 0.7;">
+              Currently includes: Camera monitoring (Blink integration)
+            </p>
           </div>
 
           <div class="setting-item">

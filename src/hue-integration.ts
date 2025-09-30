@@ -3,18 +3,6 @@
  * Handles connection and control of Philips Hue lights
  */
 
-// Declare the Electron API
-declare global {
-  interface Window {
-    electronAPI: {
-      platform: string;
-      hueDiscover: () => Promise<string | null>;
-      hueRequest: (bridgeIP: string, path: string, method: string, body?: any) => Promise<any>;
-      checkForUpdates: () => Promise<void>;
-    };
-  }
-}
-
 interface HueBridge {
   id: string;
   internalipaddress: string;
@@ -145,6 +133,11 @@ export class HueIntegration {
       return null;
     }
 
+    if (!window.electronAPI || !window.electronAPI.hueRequest) {
+      console.error('Electron API not available');
+      return null;
+    }
+
     try {
       const lights = await window.electronAPI.hueRequest(
         this.bridgeIP,
@@ -163,6 +156,11 @@ export class HueIntegration {
    */
   async getGroups(): Promise<{ [key: string]: any } | null> {
     if (!this.connected || !this.bridgeIP || !this.username) {
+      return null;
+    }
+
+    if (!window.electronAPI || !window.electronAPI.hueRequest) {
+      console.error('Electron API not available');
       return null;
     }
 

@@ -84,6 +84,99 @@ ipcMain.handle('hue-request', async (event, { bridgeIP, path, method, body }) =>
 
 console.log('💡 Hue IPC handlers registered successfully');
 
+// Blink Camera API handlers
+console.log('📹 Registering Blink IPC handlers...');
+
+ipcMain.handle('blink-request', async (event, { url, method, headers, body }) => {
+  console.log(`📹 blink-request handler called: ${method} ${url}`);
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const isHttps = urlObj.protocol === 'https:';
+    const httpModule = isHttps ? https : http;
+
+    const options = {
+      hostname: urlObj.hostname,
+      port: isHttps ? 443 : 80,
+      path: urlObj.pathname + urlObj.search,
+      method: method || 'GET',
+      headers: headers || {
+        'Content-Type': 'application/json',
+      },
+    };
+
+    const req = httpModule.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const result = JSON.parse(data);
+          console.log('📹 Request result:', result);
+          resolve(result);
+        } catch (error) {
+          console.log('📹 Request result (raw):', data);
+          resolve(data);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error('📹 HTTP error:', error);
+      reject(error);
+    });
+
+    if (body) {
+      req.write(typeof body === 'string' ? body : JSON.stringify(body));
+    }
+
+    req.end();
+  });
+});
+
+// Add handler to fetch images and convert to data URL
+ipcMain.handle('fetch-image', async (event, { url, headers }) => {
+  console.log(`📹 fetch-image handler called: ${url}`);
+  console.log(`📹 Headers:`, headers);
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const isHttps = urlObj.protocol === 'https:';
+    const httpModule = isHttps ? https : http;
+
+    const options = {
+      hostname: urlObj.hostname,
+      port: isHttps ? 443 : 80,
+      path: urlObj.pathname + urlObj.search,
+      method: 'GET',
+      headers: headers || {},
+    };
+
+    const req = httpModule.request(options, (res) => {
+      console.log(`📹 Image response status: ${res.statusCode}`);
+      console.log(`📹 Image response headers:`, res.headers);
+
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk) => { chunks.push(chunk); });
+      res.on('end', () => {
+        const buffer = Buffer.concat(chunks);
+        console.log(`📹 Image buffer size: ${buffer.length} bytes`);
+        const base64 = buffer.toString('base64');
+        const contentType = res.headers['content-type'] || 'image/jpeg';
+        const dataUrl = `data:${contentType};base64,${base64}`;
+        console.log(`📹 Image fetched successfully, data URL length: ${dataUrl.length}`);
+        resolve(dataUrl);
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error('📹 Image fetch error:', error);
+      reject(error);
+    });
+
+    req.end();
+  });
+});
+
+console.log('📹 Blink IPC handlers registered successfully');
+
 const createWindow = (): void => {
   // Get all displays for positioning
   const displays = screen.getAllDisplays();

@@ -14,12 +14,19 @@ export class BlinkIntegration {
     const savedToken = localStorage.getItem('blinkAuthToken');
     const savedAccountId = localStorage.getItem('blinkAccountId');
     const savedRegion = localStorage.getItem('blinkRegion');
-    
+
     if (savedToken && savedAccountId) {
       this.authToken = savedToken;
       this.accountId = savedAccountId;
       this.region = savedRegion || 'us-east';
       this.baseUrl = `https://rest-${this.region}.immedia-semi.com`;
+
+      // Set auth in main process for authenticated image fetching
+      if (window.electronAPI && window.electronAPI.setBlinkAuth) {
+        window.electronAPI.setBlinkAuth(this.authToken, this.accountId, this.region).catch(err => {
+          console.error('Failed to set Blink auth in main process:', err);
+        });
+      }
     }
   }
 
@@ -85,6 +92,11 @@ export class BlinkIntegration {
         localStorage.setItem('blinkRegion', this.region);
         localStorage.removeItem('blinkPendingAccountId');
         localStorage.removeItem('blinkPendingAuthToken');
+
+        // Set auth in main process for authenticated image fetching
+        if (window.electronAPI && window.electronAPI.setBlinkAuth) {
+          await window.electronAPI.setBlinkAuth(this.authToken, this.accountId, this.region);
+        }
 
         console.log('✅ Blink login successful');
         return { success: true, message: 'Login successful!' };
@@ -157,6 +169,11 @@ export class BlinkIntegration {
         localStorage.removeItem('blinkPendingClientId');
         localStorage.removeItem('blinkPendingAuthToken');
         localStorage.removeItem('blinkPendingRegion');
+
+        // Set auth in main process for authenticated image fetching
+        if (window.electronAPI && window.electronAPI.setBlinkAuth) {
+          await window.electronAPI.setBlinkAuth(this.authToken, this.accountId, this.region);
+        }
 
         console.log('✅ 2FA verification successful');
         return { success: true, message: 'Verification successful!' };
@@ -241,6 +258,13 @@ export class BlinkIntegration {
         { 'TOKEN-AUTH': this.authToken! }
       );
       console.log('📹 Homescreen full response:', data);
+      console.log('📹 Current region/tier:', this.region);
+      console.log('📹 Current baseUrl:', this.baseUrl);
+
+      // Check if there's a media server URL in the response
+      if (data.media_server) {
+        console.log('📹 Media server from response:', data.media_server);
+      }
 
       const allCameras: any[] = [];
 
@@ -249,6 +273,7 @@ export class BlinkIntegration {
         console.log('📹 Found owls (sync modules):', data.owls);
         data.owls.forEach((owl: any) => {
           console.log('📹 Processing owl:', owl);
+          console.log('📹 Owl thumbnail field:', owl.thumbnail);
           allCameras.push({
             id: owl.id,
             name: owl.name,
@@ -293,6 +318,10 @@ export class BlinkIntegration {
       }
 
       console.log('📹 Total cameras found:', allCameras.length, allCameras);
+
+      // Cache the cameras for thumbnail URL lookup
+      localStorage.setItem('blinkCameras', JSON.stringify(allCameras));
+
       return allCameras;
     } catch (error) {
       console.error('❌ Error getting homescreen:', error);
@@ -316,18 +345,23 @@ export class BlinkIntegration {
 
     try {
       // Request a new thumbnail
+      console.log('📹 Requesting new thumbnail...');
       const data = await window.electronAPI.blinkRequest(
         `${this.baseUrl}/api/v1/accounts/${this.accountId}/networks/${networkId}/cameras/${cameraId}/thumbnail`,
         'POST',
         { 'TOKEN-AUTH': this.authToken! }
       );
+      console.log('📹 Thumbnail request response:', data);
 
       // Wait a moment for the thumbnail to be generated
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       // Get the thumbnail URL (without auth in query string - will be passed as header)
       const thumbnailPath = data.thumbnail || `/api/v2/accounts/${this.accountId}/networks/${networkId}/cameras/${cameraId}/thumbnail/thumbnail.jpg`;
-      return `${this.baseUrl}${thumbnailPath}`;
+      console.log('📹 Thumbnail path from response:', thumbnailPath);
+      const fullUrl = `${this.baseUrl}${thumbnailPath}`;
+      console.log('📹 Full thumbnail URL:', fullUrl);
+      return fullUrl;
     } catch (error) {
       console.error('Error getting thumbnail:', error);
       return null;
@@ -338,7 +372,19 @@ export class BlinkIntegration {
    * Get latest thumbnail without requesting a new one
    */
   getLatestThumbnailUrl(networkId: number, cameraId: number): string {
-    // Return URL without auth in query string - will be passed as header
+    // Find the camera in our cached list to get the correct thumbnail path
+    const cameras = JSON.parse(localStorage.getItem('blinkCameras') || '[]');
+    const camera = cameras.find((c: any) => c.id === cameraId);
+
+    if (camera && camera.thumbnail) {
+      // Use the thumbnail path from the homescreen response
+      // Auth will be handled via headers in the main process
+      console.log('📹 Using cached thumbnail path:', camera.thumbnail);
+      return `${this.baseUrl}${camera.thumbnail}`;
+    }
+
+    // Fallback to constructed URL (may not work for all camera types)
+    console.log('📹 No cached thumbnail, using fallback URL');
     return `${this.baseUrl}/api/v2/accounts/${this.accountId}/networks/${networkId}/cameras/${cameraId}/thumbnail/thumbnail.jpg`;
   }
 
@@ -347,6 +393,13 @@ export class BlinkIntegration {
    */
   getAuthToken(): string | null {
     return this.authToken;
+  }
+
+  /**
+   * Get the region/tier for making authenticated requests
+   */
+  getRegion(): string {
+    return this.region;
   }
 }
 

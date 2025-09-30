@@ -5,6 +5,28 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 console.log('💡 Preload script loading...');
 
+async function invokeWithRetry<T = any>(channel: string, args: any, retries = 25, delayMs = 400): Promise<T> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      // @ts-ignore
+      return await ipcRenderer.invoke(channel, args);
+    } catch (err: any) {
+      const msg = String((err && err.message) || err);
+      if (msg.includes("No handler registered")) {
+        if (attempt < retries - 1) {
+          console.warn(`IPC '${channel}' not ready yet (attempt ${attempt + 1}/${retries}). Retrying in ${delayMs}ms...`);
+          await new Promise(res => setTimeout(res, delayMs));
+          continue;
+        }
+      }
+      throw err;
+    }
+  }
+  // Should never reach here
+  // @ts-ignore
+  return await ipcRenderer.invoke(channel, args);
+}
+
 // Expose simple API to the renderer process
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: 'electron',
@@ -22,10 +44,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     console.log(`📹 Calling blink-request from renderer: ${method} ${url}`);
     return ipcRenderer.invoke('blink-request', { url, method, headers, body });
   },
-  // Fetch image and convert to data URL
-  fetchImage: (url: string, headers?: any) => {
-    console.log(`📹 Calling fetch-image from renderer: ${url}`);
-    return ipcRenderer.invoke('fetch-image', { url, headers });
+  // Set Blink authentication in main process (with retry if main is still booting)
+  setBlinkAuth: (token: string, accountId: string, region: string) => {
+    console.log(`📹 Calling set-blink-auth from renderer`);
+    return invokeWithRetry('set-blink-auth', { token, accountId, region });
+  },
+  // Fetch Blink image with authenticated headers (with retry for initial boot race)
+  fetchBlinkImage: (url: string) => {
+    console.log(`📹 Calling fetch-blink-image from renderer: ${url}`);
+    return invokeWithRetry('fetch-blink-image', { url });
   },
   // Auto-updater API
   checkForUpdates: () => {

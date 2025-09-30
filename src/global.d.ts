@@ -8,7 +8,8 @@ interface Window {
     hueDiscover: () => Promise<string | null>;
     hueRequest: (bridgeIP: string, path: string, method: string, body?: any) => Promise<any>;
     blinkRequest: (url: string, method: string, headers?: any, body?: any) => Promise<any>;
-    fetchImage: (url: string, headers?: any) => Promise<string>;
+    setBlinkAuth: (token: string, accountId: string, region: string) => Promise<{ success: boolean }>;
+    fetchBlinkImage: (url: string) => Promise<string>;
     checkForUpdates: () => Promise<any>;
   };
 }

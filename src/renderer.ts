@@ -1338,18 +1338,26 @@ class SoundMachine {
 
       if (thumbnailUrl) {
         console.log(`📹 Thumbnail URL: ${thumbnailUrl}`);
-        // Fetch the image through the main process and convert to data URL
-        if (window.electronAPI && window.electronAPI.fetchImage) {
-          console.log('📹 Fetching image through main process...');
-          const dataUrl = await window.electronAPI.fetchImage(thumbnailUrl);
-          console.log(`📹 Received data URL, length: ${dataUrl.length}`);
-          console.log(`📹 Data URL preview: ${dataUrl.substring(0, 100)}...`);
-          cameraSnapshot.src = dataUrl;
-          cameraSnapshot.style.display = 'block';
-          if (cameraPlaceholder) cameraPlaceholder.style.display = 'none';
-          console.log('📹 Image should now be visible');
+        // Fetch the image through the main process with authenticated headers
+        if (window.electronAPI && window.electronAPI.fetchBlinkImage) {
+          try {
+            console.log('📹 Fetching image through main process with auth...');
+            const dataUrl = await window.electronAPI.fetchBlinkImage(thumbnailUrl);
+            console.log(`📹 Received data URL, length: ${dataUrl.length}`);
+            cameraSnapshot.src = dataUrl;
+            cameraSnapshot.style.display = 'block';
+            if (cameraPlaceholder) cameraPlaceholder.style.display = 'none';
+            console.log('📹 Image loaded successfully');
+          } catch (error) {
+            console.error('❌ Failed to fetch image:', error);
+            if (cameraPlaceholder) {
+              cameraPlaceholder.textContent = `Failed to load camera snapshot: ${error.message}`;
+              cameraPlaceholder.style.display = 'block';
+            }
+            cameraSnapshot.style.display = 'none';
+          }
         } else {
-          console.error('❌ fetchImage API not available');
+          console.error('❌ fetchBlinkImage API not available');
           if (cameraPlaceholder) {
             cameraPlaceholder.textContent = 'Failed to load camera snapshot';
             cameraPlaceholder.style.display = 'block';

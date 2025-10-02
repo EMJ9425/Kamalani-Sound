@@ -59,6 +59,10 @@ const api = {
     console.log('🔄 Calling check-for-updates from renderer');
     return ipcRenderer.invoke('check-for-updates');
   },
+  onUpdateAvailable: (cb: (version: string) => void) => ipcRenderer.on('update-available', (_e, v) => cb(v)),
+  onUpdateDownloadProgress: (cb: (percent: number) => void) => ipcRenderer.on('update-download-progress', (_e, p) => cb(p)),
+  onUpdateDownloaded: (cb: (version: string) => void) => ipcRenderer.on('update-downloaded', (_e, v) => cb(v)),
+  onUpdateError: (cb: (message: string) => void) => ipcRenderer.on('update-error', (_e, m) => cb(m)),
   // App version
   getAppVersion: () => ipcRenderer.invoke('get-app-version')
 };

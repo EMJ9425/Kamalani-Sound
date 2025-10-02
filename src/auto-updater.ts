@@ -42,7 +42,12 @@ export class AutoUpdater {
     // Event: Update available
     autoUpdater.on('update-available', (info) => {
       console.log('✨ Update available:', info.version);
-      
+
+      // Notify renderer that an update is available
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        this.mainWindow.webContents.send('update-available', info.version);
+      }
+
       dialog.showMessageBox(this.mainWindow!, {
         type: 'info',
         title: 'Update Available',
@@ -78,7 +83,12 @@ export class AutoUpdater {
     // Event: Update downloaded
     autoUpdater.on('update-downloaded', (info) => {
       console.log('✅ Update downloaded:', info.version);
-      
+
+      // Notify renderer that update has been downloaded
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        this.mainWindow.webContents.send('update-downloaded', info.version);
+      }
+
       dialog.showMessageBox(this.mainWindow!, {
         type: 'info',
         title: 'Update Ready',
@@ -98,6 +108,9 @@ export class AutoUpdater {
     // Event: Error
     autoUpdater.on('error', (error) => {
       console.error('❌ Update error:', error);
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        this.mainWindow.webContents.send('update-error', String(error));
+      }
     });
   }
 

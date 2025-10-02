@@ -424,6 +424,47 @@ class SoundMachine {
       });
     }
 
+    // Auto-updater event hooks for user feedback
+    try {
+      // @ts-ignore
+      const api = (window as any).electronAPI;
+      if (api?.onUpdateAvailable) {
+        api.onUpdateAvailable((version: string) => {
+          if (updateStatus) {
+            updateStatus.style.display = 'block';
+            updateStatus.textContent = `Update ${version} available. Starting download...`;
+          }
+        });
+      }
+      if (api?.onUpdateDownloadProgress) {
+        api.onUpdateDownloadProgress((percent: number) => {
+          if (updateStatus) {
+            updateStatus.style.display = 'block';
+            updateStatus.textContent = `Downloading update: ${percent}%`;
+          }
+        });
+      }
+      if (api?.onUpdateDownloaded) {
+        api.onUpdateDownloaded((version: string) => {
+          if (updateStatus) {
+            updateStatus.style.display = 'block';
+            updateStatus.textContent = `Update ${version} downloaded. The app may restart to install.`;
+          }
+        });
+      }
+      if (api?.onUpdateError) {
+        api.onUpdateError((message: string) => {
+          if (updateStatus) {
+            updateStatus.style.display = 'block';
+            updateStatus.textContent = `Update error: ${message}`;
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Updater event wiring failed', e);
+    }
+
+
     // Time format toggle buttons
     const time12hrBtn = document.getElementById('time12hr');
     const time24hrBtn = document.getElementById('time24hr');

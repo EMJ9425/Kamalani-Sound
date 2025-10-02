@@ -20,12 +20,17 @@ export class AutoUpdater {
     autoUpdater.autoDownload = false; // Don't auto-download, ask user first
     autoUpdater.autoInstallOnAppQuit = true;
 
-    // Set update server URL (can be overridden in package.json)
-    // For development/testing, you can use a local server
+    // Configure update feed
+    // 1) If UPDATE_SERVER_URL is provided, use a Generic provider (local or custom server)
     if (process.env.UPDATE_SERVER_URL) {
+      autoUpdater.setFeedURL({ provider: 'generic', url: process.env.UPDATE_SERVER_URL });
+    } else {
+      // 2) Otherwise default to GitHub Releases for this repo
+      // This allows us to test real updates without electron-builder's app-update.yml
       autoUpdater.setFeedURL({
-        provider: 'generic',
-        url: process.env.UPDATE_SERVER_URL,
+        provider: 'github',
+        owner: 'EMJ9425',
+        repo: 'Kamalani-Sound',
       });
     }
 

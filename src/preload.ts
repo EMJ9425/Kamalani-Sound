@@ -58,7 +58,9 @@ const api = {
   checkForUpdates: () => {
     console.log('🔄 Calling check-for-updates from renderer');
     return ipcRenderer.invoke('check-for-updates');
-  }
+  },
+  // App version
+  getAppVersion: () => ipcRenderer.invoke('get-app-version')
 };
 
 try {

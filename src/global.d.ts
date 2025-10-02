@@ -11,6 +11,7 @@ interface Window {
     setBlinkAuth: (token: string, accountId: string, region: string) => Promise<{ success: boolean }>;
     fetchBlinkImage: (url: string) => Promise<string>;
     checkForUpdates: () => Promise<any>;
+    getAppVersion: () => Promise<string>;
   };
 }
 

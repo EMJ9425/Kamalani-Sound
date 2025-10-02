@@ -167,6 +167,21 @@ body {
   flex-shrink: 0;
 }
 
+/* Positioning for version badge */
+.header { position: relative; }
+.version-badge {
+  position: absolute;
+  top: 1rem;
+  right: 4.5rem; /* leave space for the dim button */
+  padding: 0.25rem 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.9rem;
+}
+
+
 /* Menu Bar */
 .menu-bar {
   display: flex;

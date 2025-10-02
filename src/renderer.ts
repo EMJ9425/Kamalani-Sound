@@ -26,6 +26,8 @@ class SoundMachine {
     try {
       this.setupHomeScreen();
       this.updateSoundTitle();
+      await this.showAppVersion();
+
       await this.createAudioElement();
       this.setupControls();
       this.setupHueControls();
@@ -71,6 +73,20 @@ class SoundMachine {
       }, 3000);
     } else {
       console.error('💾 Notification element not found!');
+    }
+  }
+
+  private async showAppVersion(): Promise<void> {
+    try {
+      const badge = document.getElementById('versionBadge');
+      // @ts-ignore optional chaining for older TS
+      const api = (window as any).electronAPI;
+      if (!badge || !api || !api.getAppVersion) return;
+      const v = await api.getAppVersion();
+      badge.textContent = `Sleep v${v}`;
+      (badge as HTMLElement).style.display = 'inline-block';
+    } catch (e) {
+      console.warn('⚠️ Unable to show app version:', e);
     }
   }
 
@@ -311,7 +327,7 @@ class SoundMachine {
     if (volumeSlider) {
       volumeSlider.value = this.volume.toString();
       if (volumeValue) volumeValue.textContent = `${this.volume}%`;
-      
+
       volumeSlider.addEventListener('input', (e) => {
         this.volume = parseInt((e.target as HTMLInputElement).value);
         this.updateVolume();

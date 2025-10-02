@@ -320,6 +320,9 @@ const createWindow = (): void => {
   ipcMain.handle('check-for-updates', async () => {
     updater.checkForUpdates();
   });
+  // Provide app version to renderer
+  ipcMain.handle('get-app-version', () => app.getVersion());
+
 };
 
 // This method will be called when Electron has finished

@@ -1342,16 +1342,51 @@ class SoundMachine {
         if (window.electronAPI && window.electronAPI.fetchBlinkImage) {
           try {
             console.log('📹 Fetching image through main process with auth...');
-            const dataUrl = await window.electronAPI.fetchBlinkImage(thumbnailUrl);
-            console.log(`📹 Received data URL, length: ${dataUrl.length}`);
-            cameraSnapshot.src = dataUrl;
-            cameraSnapshot.style.display = 'block';
-            if (cameraPlaceholder) cameraPlaceholder.style.display = 'none';
-            console.log('📹 Image loaded successfully');
+
+            // When forcing a refresh, poll a few times with a cache-busting ts param
+            const tryFetch = async (url: string) => {
+              return await window.electronAPI.fetchBlinkImage(url);
+            };
+
+            let dataUrl: string | null = null;
+            if (forceRefresh) {
+              const maxAttempts = 5;
+              for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                const u = new URL(thumbnailUrl);
+                u.searchParams.set('ts', Date.now().toString());
+                console.log(`📹 Attempt ${attempt}/${maxAttempts} fetching refreshed snapshot...`);
+                const result = await tryFetch(u.toString());
+                // If different from currently displayed image, accept immediately
+                if (result && result !== cameraSnapshot.src) {
+                  dataUrl = result;
+                  break;
+                }
+                // Otherwise wait a bit and try again
+                await new Promise(r => setTimeout(r, 1000));
+              }
+              // If still null (unchanged), fetch once more and use it anyway
+              if (!dataUrl) {
+                const u = new URL(thumbnailUrl);
+                u.searchParams.set('ts', Date.now().toString());
+                dataUrl = await tryFetch(u.toString());
+              }
+            } else {
+              dataUrl = await tryFetch(thumbnailUrl);
+            }
+
+            if (dataUrl) {
+              console.log(`📹 Received data URL, length: ${dataUrl.length}`);
+              cameraSnapshot.src = dataUrl;
+              cameraSnapshot.style.display = 'block';
+              if (cameraPlaceholder) cameraPlaceholder.style.display = 'none';
+              console.log('📹 Image loaded successfully');
+            }
           } catch (error) {
             console.error('❌ Failed to fetch image:', error);
             if (cameraPlaceholder) {
-              cameraPlaceholder.textContent = `Failed to load camera snapshot: ${error.message}`;
+              // @ts-ignore - error may be string or Error
+              const msg = (error && (error.message || error.toString())) || 'Unknown error';
+              cameraPlaceholder.textContent = `Failed to load camera snapshot: ${msg}`;
               cameraPlaceholder.style.display = 'block';
             }
             cameraSnapshot.style.display = 'none';
@@ -1384,6 +1419,6 @@ class SoundMachine {
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('🚀 DOM loaded, initializing Sound Machine...');
+  console.log('🎵 DOM loaded, initializing Sound Machine...');
   new SoundMachine();
 });

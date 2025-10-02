@@ -1,6 +1,6 @@
 import type { Configuration } from 'webpack';
 
-import { rules } from './webpack.rules';
+import { mainRules } from './webpack.rules';
 import { plugins } from './webpack.plugins';
 
 export const mainConfig: Configuration = {
@@ -11,10 +11,15 @@ export const mainConfig: Configuration = {
   entry: './src/index.ts',
   // Put your normal webpack config below here
   module: {
-    rules,
+    rules: mainRules,
   },
   plugins,
   resolve: {
     extensions: ['.js', '.ts', '.jsx', '.tsx', '.css', '.json'],
+  },
+  // Ensure Node.js globals are available in main process
+  node: {
+    __dirname: false,
+    __filename: false,
   },
 };

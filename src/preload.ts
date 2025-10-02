@@ -27,8 +27,8 @@ async function invokeWithRetry<T = any>(channel: string, args: any, retries = 25
   return await ipcRenderer.invoke(channel, args);
 }
 
-// Expose simple API to the renderer process
-contextBridge.exposeInMainWorld('electronAPI', {
+// Expose simple API to the renderer process (supports both isolated and non-isolated contexts)
+const api = {
   platform: 'electron',
   // Hue Bridge API
   hueDiscover: () => {
@@ -59,6 +59,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     console.log('🔄 Calling check-for-updates from renderer');
     return ipcRenderer.invoke('check-for-updates');
   }
-});
+};
 
-console.log('💡 Preload script loaded, electronAPI exposed');
+try {
+  if (process.contextIsolated) {
+    contextBridge.exposeInMainWorld('electronAPI', api);
+  } else {
+    // @ts-ignore
+    (window as any).electronAPI = api;
+  }
+  console.log('💡 Preload script loaded, electronAPI exposed');
+} catch (err) {
+  // Fallback if contextBridge API is not available
+  // @ts-ignore
+  (window as any).electronAPI = api;
+  console.warn('💡 contextBridge not available; electronAPI attached directly to window');
+}

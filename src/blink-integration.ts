@@ -228,7 +228,12 @@ export class BlinkIntegration {
       const data = await window.electronAPI.blinkRequest(
         `${this.baseUrl}/api/v3/accounts/${this.accountId}/networks`,
         'GET',
-        { 'TOKEN-AUTH': this.authToken! }
+        {
+          'TOKEN-AUTH': this.authToken!,
+          'account-id': String(this.accountId!),
+          'Accept': 'application/json',
+          'User-Agent': 'Blink/10.2.0 (iPhone; iOS 16.6)'
+        }
       );
 
       console.log('📹 Networks response:', data);
@@ -255,7 +260,12 @@ export class BlinkIntegration {
       const data = await window.electronAPI.blinkRequest(
         `${this.baseUrl}/api/v3/accounts/${this.accountId}/homescreen`,
         'GET',
-        { 'TOKEN-AUTH': this.authToken! }
+        {
+          'TOKEN-AUTH': this.authToken!,
+          'account-id': String(this.accountId!),
+          'Accept': 'application/json',
+          'User-Agent': 'Blink/10.2.0 (iPhone; iOS 16.6)'
+        }
       );
       console.log('📹 Homescreen full response:', data);
       console.log('📹 Current region/tier:', this.region);
@@ -349,17 +359,27 @@ export class BlinkIntegration {
       const data = await window.electronAPI.blinkRequest(
         `${this.baseUrl}/api/v1/accounts/${this.accountId}/networks/${networkId}/cameras/${cameraId}/thumbnail`,
         'POST',
-        { 'TOKEN-AUTH': this.authToken! }
+        {
+          'TOKEN-AUTH': this.authToken!,
+          'account-id': String(this.accountId!),
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'Blink/10.2.0 (iPhone; iOS 16.6)'
+        }
       );
       console.log('📹 Thumbnail request response:', data);
 
       // Wait a moment for the thumbnail to be generated
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
       // Get the thumbnail URL (without auth in query string - will be passed as header)
       const thumbnailPath = data.thumbnail || `/api/v2/accounts/${this.accountId}/networks/${networkId}/cameras/${cameraId}/thumbnail/thumbnail.jpg`;
       console.log('📹 Thumbnail path from response:', thumbnailPath);
-      const fullUrl = `${this.baseUrl}${thumbnailPath}`;
+
+      // Build URL and add cache-busting timestamp to avoid CDN/browser cache
+      const urlObj = new URL(thumbnailPath, this.baseUrl);
+      urlObj.searchParams.set('ts', Date.now().toString());
+      const fullUrl = urlObj.toString();
       console.log('📹 Full thumbnail URL:', fullUrl);
       return fullUrl;
     } catch (error) {
@@ -380,12 +400,16 @@ export class BlinkIntegration {
       // Use the thumbnail path from the homescreen response
       // Auth will be handled via headers in the main process
       console.log('📹 Using cached thumbnail path:', camera.thumbnail);
-      return `${this.baseUrl}${camera.thumbnail}`;
+      const urlObj = new URL(camera.thumbnail, this.baseUrl);
+      urlObj.searchParams.set('ts', Date.now().toString());
+      return urlObj.toString();
     }
 
     // Fallback to constructed URL (may not work for all camera types)
     console.log('📹 No cached thumbnail, using fallback URL');
-    return `${this.baseUrl}/api/v2/accounts/${this.accountId}/networks/${networkId}/cameras/${cameraId}/thumbnail/thumbnail.jpg`;
+    const urlObj = new URL(`/api/v2/accounts/${this.accountId}/networks/${networkId}/cameras/${cameraId}/thumbnail/thumbnail.jpg`, this.baseUrl);
+    urlObj.searchParams.set('ts', Date.now().toString());
+    return urlObj.toString();
   }
 
   /**

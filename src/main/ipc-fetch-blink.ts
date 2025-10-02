@@ -37,13 +37,13 @@ interface FetchError {
   body: string;
 }
 
-async function fetchOnce(url: string, mode: 'bearer' | 'token-auth'): Promise<FetchResult | FetchError> {
+async function fetchOnce(url: string, mode: 'bearer' | 'token-auth', redirectsLeft = 5): Promise<FetchResult | FetchError> {
   const { token, accountId } = getBlinkAuth();
   const headers = buildHeaders(mode, token, accountId);
-  
+
   console.log(`📹 Fetching image with ${mode} mode: ${url}`);
   console.log(`📹 Headers: account-id=${accountId}, token=***${token.slice(-4)}`);
-  
+
   return new Promise((resolve) => {
     const urlObj = new URL(url);
     const isHttps = urlObj.protocol === 'https:';
@@ -60,29 +60,45 @@ async function fetchOnce(url: string, mode: 'bearer' | 'token-auth'): Promise<Fe
     const req = httpModule.request(options, (res) => {
       console.log(`📹 Response status: ${res.statusCode}`);
       console.log(`📹 Response headers:`, res.headers);
-      
+
+      // Handle redirects (3xx)
+      const status = res.statusCode || 0;
+      if (status >= 300 && status < 400 && res.headers.location) {
+        if (redirectsLeft <= 0) {
+          console.warn('📹 Too many redirects');
+          resolve({ ok: false, status, body: 'Too many redirects' });
+          return;
+        }
+        const nextUrl = new URL(res.headers.location, url).toString();
+        console.log(`📹 Following redirect to: ${nextUrl}`);
+        // Consume/ignore response data before following redirect
+        res.resume();
+        fetchOnce(nextUrl, mode, redirectsLeft - 1).then(resolve);
+        return;
+      }
+
       const chunks: Buffer[] = [];
       res.on('data', (chunk) => { chunks.push(chunk); });
       res.on('end', () => {
         const buffer = Buffer.concat(chunks);
         const textMaybe = buffer.toString('utf-8');
-        
+
         // Check if response looks like JSON error
         const looksJson = textMaybe.startsWith('{') && textMaybe.includes('"message"');
-        
-        if (res.statusCode === 200 && !looksJson) {
+
+        if (status === 200 && !looksJson) {
           // Success - return image as data URL
           const base64 = buffer.toString('base64');
-          const mime = res.headers['content-type'] || 'image/jpeg';
+          const mime = (res.headers['content-type'] as string) || 'image/jpeg';
           const dataUrl = `data:${mime};base64,${base64}`;
           console.log(`📹 Image fetched successfully, size: ${buffer.length} bytes`);
           resolve({ ok: true, dataUrl });
         } else {
           // Error - return status and body
-          console.log(`📹 Fetch failed: status=${res.statusCode}, body=${textMaybe.slice(0, 200)}`);
+          console.log(`📹 Fetch failed: status=${status}, body=${textMaybe.slice(0, 200)}`);
           resolve({
             ok: false,
-            status: res.statusCode || 0,
+            status,
             body: textMaybe.slice(0, 500) // Limit body size for logging
           });
         }
@@ -94,7 +110,7 @@ async function fetchOnce(url: string, mode: 'bearer' | 'token-auth'): Promise<Fe
       resolve({
         ok: false,
         status: 0,
-        body: error.message
+        body: (error as any).message || String(error)
       });
     });
 

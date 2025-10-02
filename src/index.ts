@@ -162,6 +162,7 @@ const createWindow = (): void => {
   });
 
   // Create the browser window.
+  const isDev = process.env.NODE_ENV === 'development';
   const mainWindow = new BrowserWindow({
     height: 800,
     width: 1200,
@@ -171,14 +172,42 @@ const createWindow = (): void => {
     icon: process.platform === 'darwin' ? undefined : 'assets/icon.png',
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
-      nodeIntegration: false,
-      contextIsolation: true,
+      nodeIntegration: isDev ? true : false,
+      contextIsolation: isDev ? false : true,
+      // Temporarily disable sandbox to fix __dirname issue
+      sandbox: false,
     },
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     show: false, // Don't show until ready
     // Start on primary display but make it easy to move
     x: primaryDisplay.bounds.x + 100,
     y: primaryDisplay.bounds.y + 100,
+  });
+
+  // Set Content Security Policy (looser in development to support webpack dev server and source maps)
+  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    const isDev = process.env.NODE_ENV === 'development';
+    const csp = isDev
+      ? "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; " +
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; " +
+        "style-src 'self' 'unsafe-inline'; " +
+        "img-src 'self' data: blob: https: http:; " +
+        "media-src 'self' data: blob: https: http:; " +
+        "connect-src * ws: wss: http: https:; " +
+        "font-src 'self' data:;"
+      : "default-src 'self'; " +
+        "script-src 'self' 'unsafe-inline'; " +
+        "style-src 'self' 'unsafe-inline'; " +
+        "img-src 'self' data: https:; " +
+        "media-src 'self' data: blob:; " +
+        "connect-src 'self' https://discovery.meethue.com https://*.immedia-semi.com https://*.blink.com; " +
+        "font-src 'self' data:;";
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [csp]
+      }
+    });
   });
 
   // Create menu with display positioning options
@@ -248,12 +277,30 @@ const createWindow = (): void => {
 
   // Show window when ready to prevent visual flash
   mainWindow.once('ready-to-show', () => {
+    console.log('🪟 Window ready-to-show - making visible');
     mainWindow.show();
+    mainWindow.focus();
+    mainWindow.moveTop();
+    console.log('🪟 Window should now be visible and focused');
     createMenu(); // Create menu after window is ready
   });
 
   // and load the index.html of the app.
+  console.log('🪟 Loading URL:', MAIN_WINDOW_WEBPACK_ENTRY);
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
+
+  // Add debugging for load events
+  mainWindow.webContents.on('did-start-loading', () => {
+    console.log('🪟 Started loading page');
+  });
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    console.log('🪟 Finished loading page');
+  });
+
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('🪟 Failed to load page:', errorCode, errorDescription);
+  });
 
   // Open the DevTools only in development
   if (process.env.NODE_ENV === 'development') {

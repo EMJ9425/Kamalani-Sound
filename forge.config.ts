@@ -19,11 +19,16 @@ const config: ForgeConfig = {
     executableName: 'sleep',
   },
   rebuildConfig: {},
-  makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})],
+  makers: [
+    new MakerSquirrel({}),
+    new MakerZIP({}, ['darwin']),
+    new MakerRpm({}),
+    new MakerDeb({ options: { name: 'sleep', bin: 'sleep' } }),
+  ],
   publishers: [
     new PublisherGithub({
       repository: { owner: 'EMJ9425', name: 'Kamalani-Sound' },
-      draft: true,
+      draft: false,
       prerelease: false,
     }),
   ],

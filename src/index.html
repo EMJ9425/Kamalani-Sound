@@ -28,8 +28,18 @@
         </nav>
         <div id="versionBadge" class="version-badge" title="App version" style="display:none;">Sleep v—</div>
 
-        <button id="dimScreen" class="dim-btn-header">💤</button>
+        <button id="dimScreen" class="dim-btn-header" title="Dim screen / Sleep mode">💤</button>
+        <button id="lightsOffBtn" class="dim-btn-header" title="Turn all lights off">💡⟂</button>
       </header>
+
+        <!-- Global Update Banner -->
+        <div id="updateBanner" class="update-banner" style="display:none;">
+          <span id="updateProgressText">Checking for updates…</span>
+          <div class="update-progress-track">
+            <div id="updateProgressBar" class="update-progress-bar" style="width:0%"></div>
+          </div>
+        </div>
+
 
       <main class="main">
         <!-- Home Page -->
@@ -39,6 +49,8 @@
             <div class="sound-info">
               <div class="sound-icon">🌧️</div>
               <h2 class="sound-title">Kamalani's Rain Sounds</h2>
+
+
             </div>
 
             <div class="player-controls">
@@ -47,6 +59,38 @@
               </button>
             </div>
           </div>
+
+            <div class="info-row" style="margin-top: 1rem; display: flex; gap: 1rem; align-items: stretch;">
+              <!-- Daily Horoscope -->
+              <div id="horoscopeCard" class="horoscope-card" style="display: none; flex: 1;">
+                <div id="horoscopeTitle" class="horoscope-title">Daily Horoscope</div>
+                <div id="horoscopeText" class="horoscope-text"></div>
+              </div>
+
+              <!-- Weather -->
+              <div id="weatherCard" class="weather-card" style="display: none; flex: 1;">
+                <div class="weather-content">
+                  <div class="weather-header">
+                    <span id="weatherIcon" class="weather-icon">⛅</span>
+                    <div class="weather-location-wrap">
+                      <div id="weatherLocation" class="weather-location">Weather</div>
+                      <div id="weatherSummary" class="weather-summary">—</div>
+                    </div>
+                  </div>
+                  <div class="weather-stats">
+                    <div class="weather-temp" id="weatherTemp">--°</div>
+                    <div class="weather-meta">
+                      <div id="weatherFeels" class="weather-feels">Feels like --°</div>
+                      <div id="weatherHighLow" class="weather-highlow">H: --°  L: --°</div>
+                    </div>
+                  </div>
+                  <div id="weatherHint" class="weather-hint" style="display:none;">Set your city/ZIP in Settings or use your location.</div>
+                </div>
+                <div id="weatherTip" class="weather-tip" style="display:none;">Tip</div>
+              </div>
+            </div>
+
+
         </div>
 
         <!-- Light switch toggle (bottom right corner) -->
@@ -280,6 +324,53 @@
             <div class="time-format-toggle">
               <button id="time12hr" class="time-format-btn active">12-Hour (AM/PM)</button>
               <button id="time24hr" class="time-format-btn">24-Hour (Military)</button>
+
+	            </div>
+
+
+
+	          <div class="setting-item">
+	            <label>🌦️ Weather</label>
+	            <p class="setting-description">Set your location and units for the Home weather card</p>
+	            <div class="weather-settings-row" style="display:flex; gap: .75rem; align-items:flex-end; flex-wrap: wrap;">
+	              <div style="flex:2; min-width: 220px;">
+	                <label for="weatherLocationInput" style="display:block; opacity:.8; font-size:.85rem;">City or ZIP</label>
+	                <input type="text" id="weatherLocationInput" class="name-input" placeholder="e.g., Honolulu or 96815">
+	              </div>
+	              <div style="flex:1; min-width: 160px;">
+	                <label for="weatherUnitsSelect" style="display:block; opacity:.8; font-size:.85rem;">Units</label>
+	                <select id="weatherUnitsSelect" class="timer-select" style="width:100%;">
+	                  <option value="fahrenheit">Fahrenheit (°F)</option>
+	                  <option value="celsius">Celsius (°C)</option>
+	                </select>
+	              </div>
+	              <div style="flex:0;">
+	                <button id="useMyLocation" class="hue-btn" title="Use current location">📍 Use my location</button>
+	              </div>
+	            </div>
+	            <p id="weatherSettingsStatus" class="setting-description" style="margin-top:.5rem; display:none;"></p>
+	          </div>
+
+	          <div class="setting-item">
+	            <label>♈ Zodiac Sign</label>
+	            <select id="zodiacSelect" class="timer-select" style="width: 100%;">
+	              <option value="">Select your sign…</option>
+	              <option value="aries">Aries ♈</option>
+	              <option value="taurus">Taurus ♉</option>
+	              <option value="gemini">Gemini ♊</option>
+	              <option value="cancer">Cancer ♋</option>
+	              <option value="leo">Leo ♌</option>
+	              <option value="virgo">Virgo ♍</option>
+	              <option value="libra">Libra ♎</option>
+	              <option value="scorpio">Scorpio ♏</option>
+	              <option value="sagittarius">Sagittarius ♐</option>
+	              <option value="capricorn">Capricorn ♑</option>
+	              <option value="aquarius">Aquarius ♒</option>
+	              <option value="pisces">Pisces ♓</option>
+	            </select>
+	            <p class="setting-description">Used for your daily horoscope on the home screen</p>
+	          </div>
+
             </div>
           </div>
 

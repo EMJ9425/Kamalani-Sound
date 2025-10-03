@@ -184,6 +184,17 @@ const createWindow = (): void => {
     y: primaryDisplay.bounds.y + 100,
   });
 
+  // Allow geolocation permission requests (for Weather "Use my location")
+  const ses = mainWindow.webContents.session;
+  ses.setPermissionRequestHandler((webContents, permission, callback) => {
+    if (permission === 'geolocation') {
+      callback(true);
+    } else {
+      callback(false);
+    }
+  });
+
+
   // Set Content Security Policy (looser in development to support webpack dev server and source maps)
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     const isDev = process.env.NODE_ENV === 'development';
@@ -200,7 +211,7 @@ const createWindow = (): void => {
         "style-src 'self' 'unsafe-inline'; " +
         "img-src 'self' data: https:; " +
         "media-src 'self' data: blob:; " +
-        "connect-src 'self' https://discovery.meethue.com https://*.immedia-semi.com https://*.blink.com; " +
+        "connect-src 'self' https://discovery.meethue.com https://*.immedia-semi.com https://*.blink.com https://api.open-meteo.com https://geocoding-api.open-meteo.com; " +
         "font-src 'self' data:;";
     callback({
       responseHeaders: {

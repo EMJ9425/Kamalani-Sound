@@ -1,0 +1,8 @@
+version: 1.0.6
+files:
+  - url: Sleep-darwin-arm64-1.0.1.zip
+    sha512: /huY+yUNljbv6ruzals9htIVC9cpOK2Rvgf9EvvlYFcLT/jNGFAr7pd1wDnvf/Yc
+F/Dx6243QfcjXBuVQnLISw==
+    size: 1027062044
+path: Sleep-darwin-arm64-1.0.1.zip
+releaseDate: '2025-10-03T00:49:59Z'

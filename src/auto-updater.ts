@@ -4,7 +4,9 @@
  */
 
 import { autoUpdater } from 'electron-updater';
-import { app, BrowserWindow, dialog } from 'electron';
+import { app, BrowserWindow, dialog, shell } from 'electron';
+import * as path from 'path';
+import * as os from 'os';
 
 export class AutoUpdater {
   private mainWindow: BrowserWindow | null = null;
@@ -20,6 +22,10 @@ export class AutoUpdater {
     autoUpdater.autoDownload = false; // Don't auto-download, ask user first
     autoUpdater.autoInstallOnAppQuit = true;
 
+
+    // Disable differential download to avoid .blockmap 404s when not generated
+    process.env.UPDATER_DISABLE_DIFFERENTIAL_DOWNLOAD = 'true';
+
     // Configure update feed
     // 1) If UPDATE_SERVER_URL is provided, use a Generic provider (local or custom server)
     if (process.env.UPDATE_SERVER_URL) {
@@ -33,6 +39,31 @@ export class AutoUpdater {
         repo: 'Kamalani-Sound',
       });
     }
+
+    // Ensure updater doesn't depend on app-update.yml inside the app bundle
+    try {
+      const userConfigDir = app.getPath('userData');
+      const cfgPath = path.join(userConfigDir, 'app-update.generated.yml');
+      const cfgYml = `provider: github\nowner: EMJ9425\nrepo: Kamalani-Sound\n`;
+      try { require('fs').writeFileSync(cfgPath, cfgYml); } catch {}
+      // Point electron-updater at our generated config so it never tries to open
+      // /Applications/Sleep.app/Contents/Resources/app-update.yml
+      // (avoids ENOENT on unsigned builds)
+      (autoUpdater as any).updateConfigPath = cfgPath;
+    } catch (e) {
+      console.warn('⚠️ Could not set updateConfigPath', e);
+    }
+
+    // Optional persistent logging (no-op if electron-log isn't installed)
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const log = require('electron-log');
+      (autoUpdater as any).logger = log;
+      if (log?.transports?.file) {
+        log.transports.file.level = 'info';
+      }
+    } catch {}
+
 
     // Event: Checking for update
     autoUpdater.on('checking-for-update', () => {
@@ -73,7 +104,7 @@ export class AutoUpdater {
     autoUpdater.on('download-progress', (progressObj) => {
       const percent = Math.round(progressObj.percent);
       console.log(`📥 Downloading update: ${percent}%`);
-      
+
       // Send progress to renderer
       if (this.mainWindow && !this.mainWindow.isDestroyed()) {
         this.mainWindow.webContents.send('update-download-progress', percent);
@@ -110,6 +141,28 @@ export class AutoUpdater {
       console.error('❌ Update error:', error);
       if (this.mainWindow && !this.mainWindow.isDestroyed()) {
         this.mainWindow.webContents.send('update-error', String(error));
+      }
+
+      // Friendly fallback for unsigned builds on macOS:
+      // If macOS blocks install due to code signature, offer to reveal the update folder.
+      const msg = String(error || '');
+      const isCodeSignBlock = msg.includes('SQRLCodeSignatureErrorDomain') || msg.includes('Code signature at URL');
+      if (isCodeSignBlock && this.mainWindow && !this.mainWindow.isDestroyed()) {
+        // macOS cache path for our app: ~/Library/Caches/Sleep/pending
+        const pendingDir = path.join(os.homedir(), 'Library', 'Caches', 'Sleep', 'pending');
+        dialog.showMessageBox(this.mainWindow, {
+          type: 'warning',
+          title: 'Manual Install Required',
+          message: 'macOS blocked automatic install because the app is not code-signed.',
+          detail: 'Click “Open Update Folder” and drag Sleep.app into /Applications to finish installing.',
+          buttons: ['Open Update Folder', 'OK'],
+          defaultId: 0,
+          cancelId: 1,
+        }).then((res) => {
+          if (res.response === 0) {
+            shell.openPath(pendingDir);
+          }
+        });
       }
     });
   }

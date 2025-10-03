@@ -14,6 +14,9 @@ class SoundMachine {
   private blink: BlinkIntegration;
   private eqFilters: BiquadFilterNode[] = [];
 
+  private lastWeather: { temp:number; apparent:number; code:number; hi:number; lo:number; units:'fahrenheit'|'celsius'; precipProb: number | null } | null = null;
+  private weatherTipTimer: any = null;
+
   constructor() {
     this.hue = new HueIntegration();
     this.blink = new BlinkIntegration();
@@ -30,6 +33,11 @@ class SoundMachine {
 
       await this.createAudioElement();
       this.setupControls();
+      this.loadHoroscope();
+      this.setupWeatherTipClick();
+
+      await this.loadWeather();
+
       this.setupHueControls();
       this.setupHomeLightControls();
       this.setupCameraControls();
@@ -372,11 +380,86 @@ class SoundMachine {
       });
     }
 
+    // Turn all lights off button
+    const lightsOffBtn = document.getElementById('lightsOffBtn') as HTMLButtonElement | null;
+    if (lightsOffBtn) {
+      lightsOffBtn.addEventListener('click', async () => {
+        try {
+          if (!this.hue.isConnected()) {
+            alert('Please connect to your Hue Bridge in Settings first.');
+            return;
+          }
+          await this.hue.turnOffAllLightsInHouse();
+          // Refresh switch state shortly after
+          setTimeout(() => this.updateLightSwitchState(), 1200);
+        } catch (e) {
+          console.error('Error turning off all lights:', e);
+          alert('Could not turn off lights. Please check your Hue connection.');
+        }
+      });
+    }
+
+
     // Settings page controls
     const settingsPage = document.getElementById('settingsPage');
     const closeSettings = document.getElementById('closeSettings');
     const saveNameBtn = document.getElementById('saveName');
     const userNameInput = document.getElementById('userName') as HTMLInputElement;
+
+    const zodiacSelect = document.getElementById('zodiacSelect') as HTMLSelectElement | null;
+    if (zodiacSelect) {
+      const savedSign = localStorage.getItem('zodiacSign') || '';
+      if (savedSign) zodiacSelect.value = savedSign;
+    }
+
+    // Weather settings controls
+    const weatherLocationInput = document.getElementById('weatherLocationInput') as HTMLInputElement | null;
+    const weatherUnitsSelect = document.getElementById('weatherUnitsSelect') as HTMLSelectElement | null;
+    const useMyLocationBtn = document.getElementById('useMyLocation') as HTMLButtonElement | null;
+    const weatherSettingsStatus = document.getElementById('weatherSettingsStatus') as HTMLParagraphElement | null;
+
+    if (weatherLocationInput) {
+      const savedQuery = localStorage.getItem('weatherLocationQuery') || '';
+      weatherLocationInput.value = savedQuery;
+    }
+    if (weatherUnitsSelect) {
+      const savedUnits = localStorage.getItem('weatherUnits') || 'fahrenheit';
+      weatherUnitsSelect.value = savedUnits;
+    }
+
+    if (useMyLocationBtn) {
+      useMyLocationBtn.addEventListener('click', () => {
+        if (!navigator.geolocation) {
+          if (weatherSettingsStatus) {
+            weatherSettingsStatus.textContent = 'Geolocation not available on this device.';
+            weatherSettingsStatus.style.display = 'block';
+          }
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            const { latitude, longitude } = pos.coords;
+            localStorage.setItem('weatherLat', String(latitude));
+            localStorage.setItem('weatherLon', String(longitude));
+            localStorage.removeItem('weatherLocationQuery'); // prefer precise coords
+            if (weatherSettingsStatus) {
+              weatherSettingsStatus.textContent = 'Using your current location.';
+              weatherSettingsStatus.style.display = 'block';
+            }
+            await this.loadWeather();
+            this.showSettingsSavedNotification();
+          },
+          (err) => {
+            console.warn('Geolocation error', err);
+            if (weatherSettingsStatus) {
+              weatherSettingsStatus.textContent = 'Could not get location. Please allow location access or enter a city/ZIP.';
+              weatherSettingsStatus.style.display = 'block';
+            }
+          },
+          { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 }
+        );
+      });
+    }
 
     if (closeSettings && settingsPage) {
       closeSettings.addEventListener('click', () => {
@@ -392,10 +475,27 @@ class SoundMachine {
         if (newName) {
           localStorage.setItem('userName', newName);
           this.updateSoundTitle(); // Update the sound title immediately
-          this.showSettingsSavedNotification();
-        } else {
-          alert('Please enter a name');
         }
+        // Save zodiac sign if provided
+        if (zodiacSelect && zodiacSelect.value) {
+          localStorage.setItem('zodiacSign', zodiacSelect.value);
+          this.loadHoroscope();
+        }
+        // Save weather units
+        if (weatherUnitsSelect && weatherUnitsSelect.value) {
+          localStorage.setItem('weatherUnits', weatherUnitsSelect.value);
+        }
+        // Save weather location query if provided
+        if (weatherLocationInput) {
+          const q = weatherLocationInput.value.trim();
+          if (q) {
+            localStorage.setItem('weatherLocationQuery', q);
+            localStorage.removeItem('weatherLat');
+            localStorage.removeItem('weatherLon');
+          }
+        }
+        this.loadWeather();
+        this.showSettingsSavedNotification();
       });
     }
 
@@ -403,7 +503,28 @@ class SoundMachine {
     const checkUpdatesBtn = document.getElementById('checkUpdates');
     const updateStatus = document.getElementById('updateStatus');
 
+
+	    // Global update banner elements (always visible under header)
+	    const updateBanner = document.getElementById('updateBanner') as HTMLDivElement | null;
+	    const updateProgressText = document.getElementById('updateProgressText') as HTMLSpanElement | null;
+	    const updateProgressBar = document.getElementById('updateProgressBar') as HTMLDivElement | null;
+
+	        // Mirror to global banner
+	        if (updateBanner && updateProgressText && updateProgressBar) {
+	          updateBanner.style.display = 'block';
+	          updateProgressText.textContent = 'Checking for updates...';
+	          updateProgressBar.style.width = '0%';
+
+        }
+
+
+        // Ensure banner is hidden by default
+        if (updateBanner) {
+          updateBanner.style.display = 'none';
+        }
+
     if (checkUpdatesBtn) {
+
       checkUpdatesBtn.addEventListener('click', async () => {
         if (updateStatus) {
           updateStatus.style.display = 'block';
@@ -415,6 +536,14 @@ class SoundMachine {
           if (updateStatus) {
             updateStatus.textContent = 'Update check initiated. You will be notified if an update is available.';
           }
+
+        // Show banner while checking
+        if (updateBanner && updateProgressText && updateProgressBar) {
+          updateBanner.style.display = 'block';
+          updateProgressText.textContent = 'Checking for updates...';
+          updateProgressBar.style.width = '0%';
+        }
+
         } catch (error) {
           console.error('Error checking for updates:', error);
           if (updateStatus) {
@@ -442,6 +571,54 @@ class SoundMachine {
             updateStatus.style.display = 'block';
             updateStatus.textContent = `Downloading update: ${percent}%`;
           }
+
+	    // Also mirror updater events to the global banner so progress is visible anywhere
+	    try {
+	      // Wire once
+	      if ((window as any).__bannerWired) { return; }
+	      (window as any).__bannerWired = true;
+
+	      const api2 = (window as any).electronAPI;
+	      if (api2?.onUpdateAvailable) {
+	        api2.onUpdateAvailable((version: string) => {
+	          if (updateBanner && updateProgressText && updateProgressBar) {
+	            updateBanner.style.display = 'block';
+	            updateProgressText.textContent = `Update ${version} available. Starting download...`;
+	            updateProgressBar.style.width = '0%';
+	          }
+	        });
+	      }
+	      if (api2?.onUpdateDownloadProgress) {
+	        api2.onUpdateDownloadProgress((percent: number) => {
+	          if (updateBanner && updateProgressText && updateProgressBar) {
+	            updateBanner.style.display = 'block';
+	            updateProgressText.textContent = `Downloading update: ${percent}%`;
+	            updateProgressBar.style.width = `${Math.max(0, Math.min(100, Math.round(percent)))}%`;
+	          }
+	        });
+	      }
+	      if (api2?.onUpdateDownloaded) {
+	        api2.onUpdateDownloaded((version: string) => {
+	          if (updateBanner && updateProgressText && updateProgressBar) {
+	            updateBanner.style.display = 'block';
+	            updateProgressText.textContent = `Update ${version} downloaded. Ready to install.`;
+	            updateProgressBar.style.width = '100%';
+	            // Keep visible until user acts; optionally hide after a delay
+	          }
+	        });
+	      }
+	      if (api2?.onUpdateError) {
+	        api2.onUpdateError((message: string) => {
+	          if (updateBanner && updateProgressText && updateProgressBar) {
+	            updateBanner.style.display = 'block';
+	            updateProgressText.textContent = `Update error: ${message}`;
+	          }
+	        });
+	      }
+	    } catch (e) {
+	      console.warn('Updater banner event wiring failed', e);
+	    }
+
         });
       }
       if (api?.onUpdateDownloaded) {
@@ -459,6 +636,50 @@ class SoundMachine {
             updateStatus.textContent = `Update error: ${message}`;
           }
         });
+
+	    // Global banner wiring (outside of per-event callbacks)
+	    try {
+	      if (!(window as any).__bannerWired) {
+	        (window as any).__bannerWired = true;
+	        const api3 = (window as any).electronAPI;
+	        if (api3?.onUpdateAvailable) {
+	          api3.onUpdateAvailable((version: string) => {
+	            if (updateBanner && updateProgressText && updateProgressBar) {
+	              updateBanner.style.display = 'block';
+	              updateProgressText.textContent = `Update ${version} available. Starting download...`;
+	              updateProgressBar.style.width = '0%';
+	            }
+	          });
+	        }
+	        if (api3?.onUpdateDownloadProgress) {
+	          api3.onUpdateDownloadProgress((percent: number) => {
+	            if (updateBanner && updateProgressText && updateProgressBar) {
+	              updateBanner.style.display = 'block';
+	              updateProgressText.textContent = `Downloading update: ${percent}%`;
+	              updateProgressBar.style.width = `${Math.max(0, Math.min(100, Math.round(percent)))}%`;
+	            }
+	          });
+	        }
+	        if (api3?.onUpdateDownloaded) {
+	          api3.onUpdateDownloaded((version: string) => {
+	            if (updateBanner && updateProgressText && updateProgressBar) {
+	              updateBanner.style.display = 'block';
+	              updateProgressText.textContent = `Update ${version} downloaded. Ready to install.`;
+	              updateProgressBar.style.width = '100%';
+	            }
+	          });
+	        }
+	        if (api3?.onUpdateError) {
+	          api3.onUpdateError((message: string) => {
+	            if (updateBanner && updateProgressText) {
+	              updateBanner.style.display = 'block';
+	              updateProgressText.textContent = `Update error: ${message}`;
+	            }
+	          });
+	        }
+	      }
+	    } catch {}
+
       }
     } catch (e) {
       console.warn('Updater event wiring failed', e);
@@ -1462,6 +1683,10 @@ class SoundMachine {
           cameraPlaceholder.style.display = 'block';
         }
         cameraSnapshot.style.display = 'none';
+
+
+
+
       }
     } catch (error) {
       console.error('Error showing camera snapshot:', error);
@@ -1472,6 +1697,255 @@ class SoundMachine {
       cameraSnapshot.style.display = 'none';
     }
   }
+  // --- Horoscope helpers ---
+  private loadHoroscope(): void {
+    const card = document.getElementById('horoscopeCard') as HTMLDivElement | null;
+    const titleEl = document.getElementById('horoscopeTitle') as HTMLDivElement | null;
+    const textEl = document.getElementById('horoscopeText') as HTMLDivElement | null;
+    if (!card || !textEl || !titleEl) return;
+
+    const sign = (localStorage.getItem('zodiacSign') || '').toLowerCase();
+    if (!sign) {
+      card.style.display = 'none';
+      return;
+    }
+
+    const emoji = this.getZodiacEmoji(sign);
+    titleEl.textContent = `${emoji} ${this.capitalize(sign)} 		— Daily Horoscope`;
+
+    const today = new Date();
+    const dayKey = today.toISOString().slice(0,10);
+    const seed = this.simpleHash(`${sign}|${dayKey}`);
+
+    const templates = [
+      'Your intuition is strong today. Trust your first instinct and keep things simple.',
+      'A small act of kindness returns to you in unexpected ways. Stay open.',
+      'Focus on one tiny improvement. Momentum beats perfection.',
+      'Clear space—physically or mentally—and you will invite calm.',
+      'A conversation brings clarity. Ask one honest question.',
+      'Energy rises in the afternoon. Plan something pleasant then.',
+      'Let music guide your mood. Light, easy rhythms help you flow.',
+      'You are closer than you think. Take the next gentle step.',
+      'Rest is productive. Give yourself permission to pause.',
+      'Gratitude turns what you have into enough. Name three things.'
+    ];
+
+    const msg = templates[seed % templates.length];
+    textEl.textContent = msg;
+    card.style.display = 'block';
+  }
+
+  private getZodiacEmoji(sign: string): string {
+    const map: Record<string,string> = {
+      aries:'♈', taurus:'♉', gemini:'♊', cancer:'♋', leo:'♌', virgo:'♍',
+      libra:'♎', scorpio:'♏', sagittarius:'♐', capricorn:'♑', aquarius:'♒', pisces:'♓'
+    };
+    return map[sign] || '⭐';
+  }
+
+  private simpleHash(str: string): number { // deterministic but simple
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return (h >>> 0);
+  }
+
+
+  private setupWeatherTipClick(): void {
+    const card = document.getElementById('weatherCard') as HTMLDivElement | null;
+    if (!card) return;
+    if ((card as any)._tipBound) return; // avoid duplicate binding
+    (card as any)._tipBound = true;
+
+    card.addEventListener('click', () => {
+      const tipEl = document.getElementById('weatherTip') as HTMLDivElement | null;
+      if (!tipEl) return;
+
+      const showing = card.classList.contains('show-tip');
+      if (showing) {
+        // Hide tip and unblur
+        card.classList.remove('show-tip');
+        tipEl.style.display = 'none';
+      } else {
+        // Show tip and blur
+        if (!this.lastWeather) return;
+        tipEl.textContent = this.getWeatherTip(this.lastWeather);
+        tipEl.style.display = 'block';
+        card.classList.add('show-tip');
+      }
+    });
+  }
+
+  private getWeatherTip(w: { temp:number; apparent:number; code:number; hi:number; lo:number; units:'fahrenheit'|'celsius'; precipProb: number | null }): string {
+    const isRain = (w.code >= 61 && w.code <= 67) || (w.code >= 80 && w.code <= 82);
+    const isSnow = (w.code >= 71 && w.code <= 77) || w.code === 85 || w.code === 86;
+    const isStorm = w.code === 95 || w.code === 96 || w.code === 99;
+    const isWetForecast = (w.precipProb ?? 0) >= 40; // 40%+ chance today
+
+    const t = w.apparent ?? w.temp;
+
+    if (w.units === 'fahrenheit') {
+      if (isSnow) return 'Wear pants and a warm jacket';
+      if (isStorm || isRain || isWetForecast) return t >= 65 ? 'Bring a light jacket' : 'Bring a jacket';
+      if (t < 40) return 'Bundle up';
+      if (t < 55) return 'Wear a jacket';
+      if (t < 65) return 'Wear pants and a light jacket';
+      if (t < 80) return 'T‑shirt is fine';
+      return 'Wear shorts';
+    } else {
+      if (isSnow) return 'Wear pants and a warm jacket';
+      if (isStorm || isRain || isWetForecast) return t >= 18 ? 'Bring a light jacket' : 'Bring a jacket';
+      if (t < 5) return 'Bundle up';
+      if (t < 13) return 'Wear a jacket';
+      if (t < 18) return 'Wear pants and a light jacket';
+      if (t < 27) return 'T‑shirt is fine';
+      return 'Wear shorts';
+    }
+  }
+
+
+  private capitalize(s: string): string { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
+
+  // --- Weather helpers ---
+  private async loadWeather(): Promise<void> {
+    try {
+      const card = document.getElementById('weatherCard') as HTMLDivElement | null;
+      const iconEl = document.getElementById('weatherIcon') as HTMLSpanElement | null;
+      const locEl = document.getElementById('weatherLocation') as HTMLDivElement | null;
+      const sumEl = document.getElementById('weatherSummary') as HTMLDivElement | null;
+      const tempEl = document.getElementById('weatherTemp') as HTMLDivElement | null;
+      const feelsEl = document.getElementById('weatherFeels') as HTMLDivElement | null;
+      const hiLoEl = document.getElementById('weatherHighLow') as HTMLDivElement | null;
+      const hintEl = document.getElementById('weatherHint') as HTMLDivElement | null;
+      if (!card || !iconEl || !locEl || !sumEl || !tempEl || !feelsEl || !hiLoEl) return;
+
+      const units = (localStorage.getItem('weatherUnits') || 'fahrenheit') as 'fahrenheit' | 'celsius';
+
+      let latStr = localStorage.getItem('weatherLat');
+      let lonStr = localStorage.getItem('weatherLon');
+      let name = localStorage.getItem('weatherLocationName') || '';
+
+      const query = localStorage.getItem('weatherLocationQuery') || '';
+      if ((!latStr || !lonStr) && query) {
+        const geo = await this.geocodeLocation(query);
+        if (geo) {
+          latStr = String(geo.lat);
+          lonStr = String(geo.lon);
+          name = geo.name || name;
+          localStorage.setItem('weatherLat', latStr);
+          localStorage.setItem('weatherLon', lonStr);
+          if (geo.name) localStorage.setItem('weatherLocationName', geo.name);
+        }
+      }
+
+      if (!latStr || !lonStr) {
+        // No location yet
+        if (hintEl) hintEl.style.display = 'block';
+        card.style.display = 'none';
+        return;
+      }
+
+      const lat = parseFloat(latStr);
+      const lon = parseFloat(lonStr);
+      const data = await this.fetchWeatherData(lat, lon, units);
+      if (!data) {
+        card.style.display = 'none';
+        return;
+      }
+
+      const unitSymbol = units === 'fahrenheit' ? '\u00b0F' : '\u00b0C';
+      const cur = data.current;
+      const daily = data.daily;
+
+      const { icon, text } = this.mapWeather(cur.weather_code, cur.is_day);
+      iconEl.textContent = icon;
+      locEl.textContent = name || 'Your location';
+      sumEl.textContent = text;
+      tempEl.textContent = `${Math.round(cur.temperature_2m)}${unitSymbol}`;
+      feelsEl.textContent = `Feels like ${Math.round(cur.apparent_temperature)}${unitSymbol}`;
+
+      let hiNum = Math.round(cur.temperature_2m);
+      let loNum = Math.round(cur.temperature_2m);
+      if (daily && daily.temperature_2m_max && daily.temperature_2m_min) {
+        hiNum = Math.round(daily.temperature_2m_max[0]);
+        loNum = Math.round(daily.temperature_2m_min[0]);
+      }
+      hiLoEl.textContent = `H: ${hiNum}${unitSymbol}  L: ${loNum}${unitSymbol}`;
+
+      // Store for tip generation on click
+      const precipProb = (daily && daily.precipitation_probability_max) ? Number(daily.precipitation_probability_max[0]) : null;
+      this.lastWeather = {
+        temp: cur.temperature_2m,
+        apparent: cur.apparent_temperature,
+        code: cur.weather_code,
+        hi: hiNum,
+        lo: loNum,
+        units,
+        precipProb,
+      };
+
+      // Reset any visible tip when weather refreshes
+      const tipEl = document.getElementById('weatherTip') as HTMLDivElement | null;
+      if (tipEl) tipEl.style.display = 'none';
+      card.classList.remove('show-tip');
+
+      if (hintEl) hintEl.style.display = 'none';
+      card.style.display = 'block';
+    } catch (err) {
+      console.warn('Weather load failed', err);
+      const card = document.getElementById('weatherCard') as HTMLDivElement | null;
+      if (card) card.style.display = 'none';
+    }
+  }
+
+  private async geocodeLocation(query: string): Promise<{ lat: number; lon: number; name: string } | null> {
+    try {
+      const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`;
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const json = await res.json();
+      const r = json && json.results && json.results[0];
+      if (!r) return null;
+      const name = [r.name, r.admin1, r.country_code].filter(Boolean).join(', ');
+      return { lat: r.latitude, lon: r.longitude, name };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  private async fetchWeatherData(lat: number, lon: number, units: 'fahrenheit' | 'celsius'): Promise<any | null> {
+    try {
+      const unitParam = units === 'fahrenheit' ? 'fahrenheit' : 'celsius';
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,is_day,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&temperature_unit=${unitParam}&timezone=auto`;
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  private mapWeather(code: number, isDay: number): { icon: string; text: string } {
+    // Based on Open-Meteo WMO weather codes
+    const day = isDay === 1;
+    if (code === 0) return { icon: day ? '☀️' : '🌙', text: day ? 'Clear sky' : 'Clear night' };
+    if (code === 1) return { icon: day ? '🌤️' : '🌥️', text: 'Mainly clear' };
+    if (code === 2) return { icon: '⛅', text: 'Partly cloudy' };
+    if (code === 3) return { icon: '☁️', text: 'Overcast' };
+    if (code === 45 || code === 48) return { icon: '🌫️', text: 'Foggy' };
+    if (code >= 51 && code <= 57) return { icon: '🌦️', text: 'Drizzle' };
+    if (code >= 61 && code <= 67) return { icon: '🌧️', text: 'Rain' };
+    if (code >= 71 && code <= 77) return { icon: '🌨️', text: 'Snow' };
+    if (code >= 80 && code <= 82) return { icon: '🌧️', text: 'Showers' };
+    if (code === 85 || code === 86) return { icon: '🌨️', text: 'Snow showers' };
+    if (code === 95) return { icon: '⛈️', text: 'Thunderstorm' };
+    if (code === 96 || code === 99) return { icon: '⛈️', text: 'Thunderstorm' };
+    return { icon: '🌡️', text: 'Weather' };
+  }
+
 }
 
 // Initialize the app when DOM is loaded

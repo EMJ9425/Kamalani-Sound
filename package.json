@@ -11,7 +11,10 @@
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
-    "install:exfat": "npm install --no-bin-links"
+    "install:exfat": "npm install --no-bin-links",
+    "release": "bash scripts/release.sh",
+    "release:minor": "bash scripts/release.sh minor",
+    "release:major": "bash scripts/release.sh major"
   },
   "keywords": [],
   "author": "ErikStudio",

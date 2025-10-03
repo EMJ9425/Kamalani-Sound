@@ -1,7 +1,7 @@
 {
   "name": "sleep",
   "productName": "Sleep",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "A beautiful ambient sound machine for focus, relaxation, and sleep",
   "main": ".webpack/main",
   "scripts": {
